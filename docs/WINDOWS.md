@@ -86,6 +86,18 @@ npm start
   nawet bez tego, ale zezwolenie usuwa problemy z podglądem z telefonu.
 - Zatrzymanie serwera: **Ctrl + C** w oknie PowerShell.
 
+### Wariant bez npm (gdy PowerShell blokuje `npm.ps1`)
+
+Serwer to zwykły skrypt Node — możesz pominąć npm całkowicie:
+
+```powershell
+node tools/serve.mjs
+```
+
+Efekt jest identyczny: `http://localhost:8080`. Bez npm nie uruchomisz tylko
+`npm test` i `npm run shots` (te potrzebują `pngjs`), ale **do grania npm nie jest
+potrzebny**.
+
 > **Nie otwieraj `index.html` przez dwuklik.** Gra używa ES modules i przy
 > `file:///C:/...` przeglądarka zablokuje ładowanie plików (CORS). Zawsze przez
 > `npm start` i `http://localhost:8080`.
@@ -160,14 +172,43 @@ node tools/export_amiga.mjs   # IFF ILBM 32 i 64 kolory + palety .pal
 node tools/export_map.mjs     # miasto w formacie .amb
 ```
 
-Jeśli PowerShell odmówi uruchomienia `npm` z błędem o `npm.ps1` i zasadach
-wykonywania skryptów:
+### Gdy `npm` nie działa: `npm.ps1 cannot be loaded…`
+
+To nie jest błąd Node.js, tylko polityka wykonywania skryptów PowerShell.
+Masz trzy wyjścia — od najprostszego:
+
+1. **Używaj `npm.cmd`** zamiast `npm` (ten plik nie jest skryptem PowerShell):
+
+```powershell
+npm.cmd -v
+npm.cmd start
+npm.cmd test
+```
+
+2. **Zmień politykę tylko dla siebie** (jednorazowo, bez uprawnień administratora):
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
-albo używaj `npm.cmd start`, `npm.cmd test`.
+Potwierdź `Y`. Potem `npm -v` działa w tym i kolejnych oknach. Sprawdzenie:
+
+```powershell
+Get-ExecutionPolicy -List
+```
+
+3. **Obejdź npm całkowicie** — do samego grania wystarczy:
+
+```powershell
+node tools/serve.mjs
+```
+
+Jeśli polityka jest narzucona przez administratora (`MachinePolicy`/`UserPolicy`),
+punkt 1 lub 3 zadziała zawsze.
+
+> Uruchamiaj grę **w katalogu projektu** (np. `C:\Gry\AmBoid`), a nie w
+> `C:\WINDOWS\system32`. W system32 nie ma plików gry i zapis może wymagać
+> uprawnień administratora.
 
 ---
 
@@ -188,7 +229,8 @@ albo używaj `npm.cmd start`, `npm.cmd test`.
 | Objaw | Przyczyna / rozwiązanie |
 | --- | --- |
 | `npm` nie jest rozpoznawane | Node bez PATH — przeinstaluj z opcją „Add to PATH", otwórz **nowe** okno PowerShell |
-| `npm.ps1 cannot be loaded…` | execution policy — patrz sekcja 5 (`Set-ExecutionPolicy` lub `npm.cmd`) |
+| `npm.ps1 cannot be loaded…` | polityka PowerShell — użyj `npm.cmd start` albo `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (sekcja 5) |
+| `npm` działa, ale nie ma gry | jesteś w `C:\WINDOWS\system32` — wejdź do katalogu projektu (`cd C:\Gry\AmBoid`) |
 | Pusta/biała strona | otwarto `file://` zamiast `http://localhost:8080`; odśwież Ctrl+F5 |
 | `EADDRINUSE` / port zajęty | zmień port: `$env:PORT=8081; npm start` |
 | Brak dźwięku | kliknij najpierw w planszę gry |
