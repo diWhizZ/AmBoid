@@ -67,6 +67,18 @@ dir
 
 Powinny być m.in. `index.html`, `package.json`, `src`, `tools`, `docs`.
 
+### Masz starszy ZIP? Aktualizacja bez Gita
+
+Wersję poznasz po pliku `src\profiles.js` i panelu **„GRAFIKA: AGA 64 KOLORY"**
+na ekranie tytułowym. Jeśli ich nie ma, to stary build bez trybu AGA/RTG
+i klawisz **G** nie zadziała.
+
+1. Wejdź na **https://github.com/diWhizZ/AmBoid/tree/arena/cb222f77-amboid**.
+2. **Code → Download ZIP**.
+3. Rozpakuj do **nowego** folderu, np. `D:\Gry\AmBoid-021`.
+4. Uruchom tam `node tools/serve.mjs` (albo `npm.cmd start`).
+5. Sprawdź w konsoli przeglądarki (F12) komunikat `AMBOID v0.2.1…`.
+
 ---
 
 ## 3. Uruchom grę
@@ -235,6 +247,7 @@ punkt 1 lub 3 zadziała zawsze.
 | Pusta/biała strona | otwarto `file://` zamiast `http://localhost:8080`; odśwież Ctrl+F5 |
 | `EADDRINUSE` / port zajęty | zmień port: `$env:PORT=8081; npm start` |
 | Brak dźwięku | kliknij najpierw w planszę gry |
+| `G` nie zmienia grafiki | stary ZIP bez `src\profiles.js` — pobierz wersję 0.2.1 (sekcja 2) |
 | Gra pamięta tryb RTG i wygląda ciemno | to noc w RTG — wciśnij **G**, aby wrócić do AGA, albo zagraj do rana |
 | Obraz rozmyty | ustaw zoom przeglądarki na 100% (Ctrl+0); gra skaluje piksele całkowitą wielokrotnością |
 | Firewall blokuje podgląd z innego urządzenia | zezwól Node.js w zaporze dla sieci prywatnej |

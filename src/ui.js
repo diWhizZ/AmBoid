@@ -105,7 +105,7 @@ export function drawTitle(game) {
   scr.frame(45, 176, 230, 13, C.SLATE_DARK);
   txt(scr, 'STRZAŁKI + ENTER  ·  G ZMIENIA TRYB', tx, 179, C.BONE, { align: 'center' });
   scr.rect(287, 190, 30, 8, C.SHADOW);
-  txt(scr, 'V0.2', 315, 191, C.SLATE, { align: 'right' });
+  txt(scr, 'V0.2.1', 315, 191, C.SLATE, { align: 'right' });
 }
 
 // ---------------------------------------------------------------------------

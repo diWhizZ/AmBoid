@@ -1,6 +1,6 @@
 // Testy akceptacyjne mechanik. Uruchomienie: node tools/gametest.mjs
 import { buildArt } from '../src/art.js';
-import { Screen } from '../src/render.js';
+import { Screen, isoX, isoY } from '../src/render.js';
 import { Game } from '../src/game.js';
 import { World } from '../src/world.js';
 import { ITEMS } from '../src/items.js';
@@ -122,6 +122,72 @@ section('Ruch gracza');
   walkOne(g, 'KeyS');
   check('zombie blokuje kafel', g.player.x === before.x && g.player.y === before.y,
     `gracz ${g.player.x},${g.player.y}, zombie ${z.x},${z.y}`);
+}
+
+section('Kierunki ruchu i przełącznik grafiki');
+{
+  const g = newGame();
+  g.world.zombies = [];
+  // plac z ośmioma przejezdnymi sąsiadami — czysty pomiar kierunków
+  let spot = null;
+  for (let y = 2; y < g.world.h - 2 && !spot; y++) {
+    for (let x = 2; x < g.world.w - 2; x++) {
+      if (!g.world.isWalkable(x, y)) continue;
+      const ok = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1], [1, 1], [-1, -1]].every(
+        ([dx, dy]) => g.world.isWalkable(x + dx, y + dy),
+      );
+      if (ok) { spot = { x, y }; break; }
+    }
+  }
+  check('znaleziono otwarty plac do testu ruchu', !!spot);
+  const measure = (code) => {
+    teleport(g, spot.x, spot.y);
+    g.keys.clear();
+    g.moveStack = [];
+    const x0 = isoX(g.player.vx, g.player.vy);
+    const y0 = isoY(g.player.vx, g.player.vy);
+    walkOne(g, code);
+    return [isoX(g.player.vx, g.player.vy) - x0, isoY(g.player.vx, g.player.vy) - y0];
+  };
+  const [ax, ay] = measure('KeyA');
+  const [dx, dy] = measure('KeyD');
+  const [wx, wy] = measure('KeyW');
+  const [sx, sy] = measure('KeyS');
+  check('A idzie w lewo', ax < 0 && Math.abs(ay) < 1, `ekran ${ax},${ay}`);
+  check('D idzie w prawo', dx > 0 && Math.abs(dy) < 1, `ekran ${dx},${dy}`);
+  check('W idzie w górę', wy < 0 && Math.abs(wx) < 1, `ekran ${wx},${wy}`);
+  check('S idzie w dół', sy > 0 && Math.abs(sx) < 1, `ekran ${sx},${sy}`);
+  check('A i D nie są zamienione', ax < 0 && dx > 0);
+  check('jeden krok to maksymalnie kafel (32 px w poziomie)', Math.abs(ax) <= 32 && Math.abs(dx) <= 32);
+  // kombinacja W+D daje skos ekranu w prawo-górę
+  teleport(g, spot.x, spot.y);
+  g.keys.clear();
+  g.moveStack = [];
+  const cx0 = isoX(g.player.vx, g.player.vy);
+  const cy0 = isoY(g.player.vx, g.player.vy);
+  g.keyDown('KeyW');
+  g.keyDown('KeyD');
+  for (let i = 0; i < 40 && !g.player.moving; i++) g.update(1 / 60);
+  for (let i = 0; i < 60 && g.player.moving; i++) g.update(1 / 60);
+  g.keyUp('KeyW');
+  g.keyUp('KeyD');
+  const cdx = isoX(g.player.vx, g.player.vy) - cx0;
+  const cdy = isoY(g.player.vx, g.player.vy) - cy0;
+  check('W+D daje skos w prawo-górę', cdx > 0 && cdy < 0, `ekran ${cdx},${cdy}`);
+
+  // G w każdym trybie, także na mapie
+  const p0 = g.profileId;
+  g.mode = 'map';
+  g.keyDown('KeyG');
+  check('G zmienia tryb grafiki także na mapie', g.profileId !== p0, `${p0} -> ${g.profileId}`);
+  g.mode = 'playing';
+  g.profileId = 'aga';
+  g.screen.setProfile(g.profile);
+  const p1 = g.profileId;
+  g.keyDown('KeyG');
+  check('G przełącza AGA -> RTG', p1 === 'aga' && g.profileId === 'rtg');
+  g.keyDown('KeyG');
+  check('G przełącza RTG -> OCS', g.profileId === 'ocs');
 }
 
 section('Interakcje i łupy');

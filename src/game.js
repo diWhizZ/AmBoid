@@ -36,11 +36,13 @@ const MOVE_CODES = {
   KeyD: 'right',
   ArrowRight: 'right',
 };
+// W trybie izometrycznym ekranowe „lewo" to na mapie (−x, +y), a „prawo" (+x, −y).
+// Wcześniej lewo i prawo były zamienione — A szło w prawo, D w lewo.
 const MOVES = {
   up: { dx: -1, dy: -1, dir: 1 },
   down: { dx: 1, dy: 1, dir: 0 },
-  left: { dx: 1, dy: -1, dir: 2 },
-  right: { dx: -1, dy: 1, dir: 3 },
+  left: { dx: -1, dy: 1, dir: 2 },
+  right: { dx: 1, dy: -1, dir: 3 },
 };
 
 const ACTIONS = ['Space', 'KeyE', 'KeyQ', 'KeyF', 'KeyM', 'KeyH', 'Escape', 'Enter'];
@@ -384,8 +386,11 @@ export class Game {
     if (p.moving) {
       p.moveT += dt;
       const k = Math.min(1, p.moveT / p.moveDur);
-      p.vx = p.fromX + (p.toX - p.fromX) * k;
-      p.vy = p.fromY + (p.toY - p.fromY) * k;
+      // złagodzenie startu i stopu kroku — pojedyncze naciśnięcie nie wygląda
+      // jak teleport o cały kafel
+      const e = k * k * (3 - 2 * k);
+      p.vx = p.fromX + (p.toX - p.fromX) * e;
+      p.vy = p.fromY + (p.toY - p.fromY) * e;
       if (k >= 1) {
         p.x = p.toX;
         p.y = p.toY;
@@ -1678,6 +1683,12 @@ export class Game {
   // -------------------------------------------------------------------------
   keyDown(code, repeat = false) {
     this.audio.init();
+    // G działa w każdym trybie (gra, pauza, mapa, pomoc, menu) — jeden punkt
+    // wejścia zamiast kopii w kilku gałęziach.
+    if (code === 'KeyG' && !repeat) {
+      this.cycleProfile();
+      return true;
+    }
     if (repeat && !MOVE_CODES[code]) return true;
     if (MOVE_CODES[code]) {
       if (!this.keys.has(code)) this.moveStack.push(code);
@@ -1712,9 +1723,6 @@ export class Game {
           this.helpReturn = 'paused';
           this.mode = 'help';
           return true;
-        case 'KeyG':
-          this.cycleProfile();
-          return true;
         case 'Escape':
           this.mode = 'paused';
           this.menuIndex = 0;
@@ -1747,10 +1755,6 @@ export class Game {
         this.menuAction('back');
         return true;
       }
-      if (code === 'KeyG') {
-        this.cycleProfile();
-        return true;
-      }
       return false;
     }
 
@@ -1777,10 +1781,6 @@ export class Game {
       if (code === 'Enter' || code === 'Space') {
         const items = this.menuItems();
         if (items[this.menuIndex]) this.menuAction(items[this.menuIndex].action);
-        return true;
-      }
-      if (code === 'KeyG') {
-        this.cycleProfile();
         return true;
       }
       return false;

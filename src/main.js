@@ -31,6 +31,7 @@ try {
 }
 
 window.AMBOID = game;
+console.log('AMBOID v0.2.1 — tryby grafiki: OCS 32 / AGA 64 / RTG RGB (klawisz G)');
 
 const image = ctx.createImageData(VIEW_W, VIEW_H);
 const out32 = new Uint32Array(image.data.buffer);

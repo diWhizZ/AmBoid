@@ -1,6 +1,6 @@
 {
   "name": "amboid",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AMBOID \u2014 izometryczny survival zombie w stylu Project Zomboid na Amidze (A1200 AGA 64 kolory / RTG, 320x200). Prototyp HTML5.",
   "main": "index.js",
   "directories": {
