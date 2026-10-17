@@ -499,13 +499,14 @@ export function drawRain(game, force = false) {
   if (!force && game.weather !== 'rain') return;
   const scr = game.screen;
   const t = game.t;
-  const n = force ? 55 : 60;
+  const n = force ? 80 : 90;
   for (let i = 0; i < n; i++) {
     const x = ((i * 53 + Math.floor(t * 60)) % 340) - 10;
     const y = ((i * 97 + Math.floor(t * 240)) % 240) - 20;
-    const color = i % 5 === 0 ? C.BONE : i % 3 === 0 ? C.STEEL : C.SLATE;
-    scr.line(x, y, x - 1, y + 3, color);
-    if (i % 7 === 0) scr.line(x - 2, y + 5, x - 3, y + 7, color);
+    // jasne smugi: ciemny deszcz ginął na asfalcie i w trawie
+    const color = i % 3 === 0 ? C.BONE : i % 3 === 1 ? C.STEEL : C.CONCRETE;
+    scr.line(x, y, x - 1, y + 4, color);
+    if (i % 7 === 0) scr.line(x - 2, y + 5, x - 3, y + 8, color);
     // rozbryzgi na ziemi — kropla uderza i rozpryskuje się w dwie kropki
     if (i % 9 === 0) {
       const gy = ((i * 71 + Math.floor(t * 120)) % 190) + 8;

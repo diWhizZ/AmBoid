@@ -73,6 +73,7 @@ game.selected = game.inventory.length - 1;
 game.player.x = 26; game.player.y = 8; game.player.vx = 26; game.player.vy = 8;
 game.updateFOV(true);
 game.tryAttack();
+for (const z of game.world.zombies) z.flash = 0; // bez białej klatki trafienia na zrzucie
 game.render();
 save('03-walka.png');
 
@@ -81,6 +82,7 @@ game.setProfile('rtg', true);
 game.time = 23 * 60;
 game.weather = 'clear';
 game.player.flashlightOn = true;
+game.player.dir = 0; // stożek latarki w stronę kamery — najlepiej widoczny na zrzucie
 game.updateFOV(true);
 game.update(0.05);
 game.render();
@@ -90,6 +92,7 @@ save('04-noc.png');
 game.setProfile('aga', true);
 game.time = 12 * 60 + 40;
 game.player.flashlightOn = false;
+for (const z of game.world.zombies) z.flash = 0;
 game.weather = 'rain';
 game.updateFOV(true);
 game.render();
