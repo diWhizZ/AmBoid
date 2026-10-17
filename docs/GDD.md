@@ -1,6 +1,6 @@
 # AMBOID — dokument projektowy (GDD)
 
-Wersja 0.2.4 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
+Wersja 0.2.5 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
 
 ---
 
@@ -296,7 +296,14 @@ z martwą strefą, anulowanie rozkazu nowym kliknięciem. Klawiatura i pad pozos
 **v0.2.4 — widok daleki.** Zoom-out 0,75×, bufor 427×267, przełączanie V,
 URL i zapis ustawienia. Filtr MAJORITY 2×2 zachowuje indeksy palety; HUD i
 rozkazy pozostają ostre. Całopikselowa kamera, przeliczenia myszy/świateł/FOV,
-jasny dzień bez przygaszania pamięci mapy. 204 testy akceptacyjne.
+jasny dzień bez przygaszania pamięci mapy.
+
+**v0.2.5 — grunt i podłogi.** Kafle terenu generowane bez oświetlenia
+pojedynczego rombu: ton opisuje materiał i zabrudzenie. Wzory strukturalne
+(fugi, deski, ceramika, dylatacje) liczone w UV płaszczyzny podłogi, więc są
+ciągłe między kaflami; dobór wariantów = faza siatki + detal z hasza(seed, x, y).
+Maska rombu 256 px daje składanie dużych płaszczyzn bez dziur i nadpisań.
+Krawężnik wyłącznie na granicy chodnika i jezdni. 215 testów akceptacyjnych.
 
 **Następny etap 4 — styl Cannon Fodder:** małe ikony z 16-kolorowej podpalety,
 2–4 klatki, mirror, krew/łuski/dym/błysk/ślady stóp, dopracowanie portretu i

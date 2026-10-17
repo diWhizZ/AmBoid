@@ -294,21 +294,25 @@ const GROUND_DRAW = {
   // Ziemia: nieregularne płaty, spokojne ziarno, pojedyncze kamienie.
   dirt(g) {
     const { pb, rng, detail } = g;
-    for (let i = 0; i < 5; i++) {
+    // nieregularne płaty: większe, miękkie plamy zamiast kaszy punktów
+    const patches = 3 + (detail % 3);
+    for (let i = 0; i < patches; i++) {
       const [cx, cy] = randInner(rng);
-      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(1, 3), rng.chance(0.5) ? C.WOOD : C.GOLD, 0.6);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(2, 3), rng.chance(0.5) ? C.WOOD : C.GOLD, 0.45);
     }
-    for (let i = 0; i < 4; i++) {
-      const [cx, cy] = randInner(rng);
-      blobIn(pb, MASK_INNER, rng, cx, cy, 1, rng.chance(0.5) ? X.DIRT_LIT : C.WOOD_DARK, 0.7);
-    }
+    // spokojne ziarno: pary pikseli w komórkach płaszczyzny, nie szum per piksel
+    g.each((x, y, u, v) => {
+      if (hash2(Math.floor(u * 8), Math.floor(v * 8), 613) > 0.88 && hash2(x, y, 727) > 0.45) {
+        pb.set(x, y, rng.chance(0.5) ? X.DIRT_LIT : C.WOOD_DARK);
+      }
+    });
+    // pojedyncze kamienie: tylko część wariantów, kształt z RNG
     if (detail >= 3) {
       const [cx, cy] = randInner(rng);
-      if (MASK_INNER.get(cx + 1, cy) === 1 && MASK_INNER.get(cx, cy + 1) === 1) {
-        pb.set(cx, cy, C.CONCRETE);
-        pb.set(cx + 1, cy, C.CONCRETE_DARK);
-        pb.set(cx, cy + 1, C.CONCRETE_DARK);
-      }
+      const r = rng.int(0, 1);
+      blobIn(pb, MASK_INNER, rng, cx, cy, r, C.CONCRETE_DARK, 1);
+      pb.set(cx, cy, C.CONCRETE);
+      if (r === 1) pb.set(cx + 1, cy, X.ASPHALT_HI);
     }
   },
 
@@ -439,9 +443,10 @@ const GROUND_DRAW = {
     }
     for (let i = 0; i < 3; i++) {
       const [cx, cy] = randInner(rng);
-      if (MASK_INNER.get(cx + 1, cy) === 1) {
+      const [dx, dy] = rng.pick([[1, 0], [0, 1], [1, 1], [-1, 1]]);
+      if (MASK_INNER.get(cx + dx, cy + dy) === 1) {
         pb.set(cx, cy, X.ASPHALT_HI);
-        pb.set(cx + 1, cy, C.ASPHALT);
+        pb.set(cx + dx, cy + dy, C.ASPHALT);
       }
     }
     for (let i = 0; i < 2; i++) {

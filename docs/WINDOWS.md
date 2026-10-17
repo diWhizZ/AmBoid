@@ -1,4 +1,4 @@
-# AMBOID v0.2.4 pod Windows — ZIP, bez Gita
+# AMBOID v0.2.5 pod Windows — ZIP, bez Gita
 
 Cel: **rozbudowana A1200 AGA (64 kolory) albo karta RTG (światło RGB)**.
 To jeden prototyp przeglądarkowy, nie dwa programy i nie natywny plik `.exe`.
@@ -6,21 +6,24 @@ Tryb OCS 32 jest wyłącznie zgodnością; domyślny profil to AGA.
 
 ## 1. Pobierz i rozpakuj
 
-- [Release v0.2.4](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.4)
-- **[ZIP źródeł v0.2.4](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.4.zip)** — stała wersja, dostępny teraz
+- [Release v0.2.5](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.5)
+- **[ZIP źródeł v0.2.5](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.5.zip)** — stała wersja
+- [ZIP gałęzi roboczej v0.2.5](https://github.com/diWhizZ/AmBoid/archive/refs/heads/arena/b923a220-amboid.zip) — stan bieżącego PR
 - [main.zip](https://github.com/diWhizZ/AmBoid/archive/refs/heads/main.zip) — najnowszy stan po scaleniu PR
+- historycznie: [ZIP źródeł v0.2.4](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.4.zip)
 
-Nie potrzebujesz Gita. ZIP tagu ma podfolder `AmBoid-0.2.4`; rozpakuj go do
+Nie potrzebujesz Gita. ZIP tagu ma podfolder `AmBoid-0.2.5`; rozpakuj go do
 `D:\pobrane\zomboid`, żeby otrzymać:
-`D:\pobrane\zomboid\AmBoid-0.2.4`.
+`D:\pobrane\zomboid\AmBoid-0.2.5`.
 W tym folderze mają być od razu `index.html`, `package.json`, `src`, `tools`, `docs`.
 Nie uruchamiaj projektu wewnątrz archiwum ani w `C:\WINDOWS\system32`.
 Archiwum `main.zip` ma własny podfolder `AmBoid-main` — wejdź do niego.
 
 Na stronie Release można też pobrać **Source code (zip)** — to ten sam tag.
-Osobny asset o nazwie `AmBoid-0.2.4.zip` nie został jeszcze dołączony z powodu
-blokady `uploads.github.com` i braku uprawnienia `workflows` połączenia Arena.
-Nie potrzebujesz tego assetu, aby uruchomić grę z ZIP-a tagu.
+Osobny asset o nazwie `AmBoid-0.2.5.zip` może nie być dołączony do Release
+z powodu blokady `uploads.github.com` i braku uprawnienia `workflows`
+połączenia Arena — ZIP tagu lub gałęzi powyżej zawiera dokładnie te same
+źródła i działa zawsze. Nie potrzebujesz osobnego assetu, aby grać.
 [Szczegóły publikacji](PUBLIKACJA.md).
 
 ## 2. Uruchom — bez npm i bez zmiany ExecutionPolicy
@@ -29,7 +32,7 @@ Wystarczy zainstalowany Node.js (np. **v24.22.0**) i aktualny Chrome/Edge/Firefo
 Sprawdzenie: `node -v`.
 
 ```powershell
-cd D:\pobrane\zomboid\AmBoid-0.2.4
+cd D:\pobrane\zomboid\AmBoid-0.2.5
 node tools/serve.mjs
 ```
 
