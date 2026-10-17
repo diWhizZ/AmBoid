@@ -95,14 +95,14 @@ export function drawTitle(game) {
   txt(scr, 'A1200  ·  RTG  ·  TRYB ZGODNOŚCI OCS', tx, 87, C.STEEL, { align: 'center' });
 
   // --- menu ---
-  scr.rect(90, 100, 140, 77, C.SHADOW);
-  scr.frame(89, 99, 142, 79, C.SLATE);
-  scr.frame(91, 101, 138, 75, C.OUTLINE);
-  menuList(game, 97, 104, 126, 10, 2);
+  scr.rect(90, 100, 140, 72, C.SHADOW);
+  scr.frame(89, 99, 142, 74, C.SLATE);
+  scr.frame(91, 101, 138, 70, C.OUTLINE);
+  menuList(game, 97, 103, 126, 10, 1);
 
   // --- stopka ---
-  scr.rect(46, 177, 228, 11, C.SHADOW);
-  scr.frame(45, 176, 230, 13, C.SLATE_DARK);
+  scr.rect(24, 177, 272, 11, C.SHADOW);
+  scr.frame(23, 176, 274, 13, C.SLATE_DARK);
   txt(scr, 'STRZAŁKI + ENTER · G GRAFIKA · K SCHEMAT', tx, 179, C.BONE, { align: 'center' });
   scr.rect(287, 190, 30, 8, C.SHADOW);
   txt(scr, 'V0.2.2', 315, 191, C.SLATE, { align: 'right' });
