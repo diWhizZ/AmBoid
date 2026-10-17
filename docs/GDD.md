@@ -225,7 +225,8 @@ Ziarno pozwala powtórzyć dokładnie to samo miasteczko.
   4 kolory krwi, 4 skóry, 4 neutralne, żółty UI, niebieski woda.
 - **Font:** 5×7 px, ręcznie rysowany, z polskimi diakrytykami (glif bazowy +
   kropka/kreska/ogonek). Skala 1× i 2×.
-- **Dither:** matryca Bayera 4×4 do cieni (3 poziomy przygaszenia).
+- **Ciemność:** 4 tablice przemapowania indeksów (dzień / zmierzch / noc / pamięć) +
+  lekki dither Bayera 4×4 na najciemniejszych poziomach, żeby rozbić pasy.
 - **Dźwięk:** WebAudio, fale square/sawtooth/triangle + szum:
   kroki, ciosy, strzał, jęki zombie, drzwi, deski, jedzenie, śmierć, fanfara.
   Tło: wiatr (filtrowany szum) i deszcz (highpass).

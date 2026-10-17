@@ -38,26 +38,6 @@ function outlined(pb, color = C.OUTLINE) {
   return out;
 }
 
-function paintMasked(pb, mask, x, y, w, h, color, chance = 1, rng = Math.random) {
-  const rand = typeof rng === 'function' ? rng : () => rng.next();
-  for (let yy = y; yy < y + h; yy++) {
-    for (let xx = x; xx < x + w; xx++) {
-      if (xx < 0 || yy < 0 || xx >= pb.w || yy >= pb.h) continue;
-      if (rand() > chance) continue;
-      if (mask.get(xx, yy) !== TRANSPARENT) pb.set(xx, yy, color);
-    }
-  }
-}
-
-function fillRows(pb, yStart, yEnd, colorFn) {
-  for (let y = yStart; y < yEnd; y++) {
-    for (let x = 0; x < pb.w; x++) {
-      const c = colorFn(x, y);
-      if (c !== TRANSPARENT) pb.set(x, y, c);
-    }
-  }
-}
-
 // ---------------------------------------------------------------------------
 // PODŁOGI / TEREN
 // ---------------------------------------------------------------------------
@@ -226,9 +206,9 @@ function makeWall(material, feature = null) {
   const H = WALL_H;
   const pb = new PixelBuffer(32, H + 16);
   const style = {
-    brick: { left: C.BLOOD_DARK, right: C.BLOOD, light: C.BLOOD_BRIGHT, cap: C.SLATE_DARK, capHi: C.SLATE, mortar: C.OUTLINE },
-    concrete: { left: C.ASPHALT, right: C.CONCRETE, light: C.BONE, cap: C.SLATE_DARK, capHi: C.STEEL, mortar: C.ASPHALT_DARK },
-    wood: { left: C.WOOD_DARK, right: C.WOOD, light: C.WOOD_LIGHT, cap: C.SLATE_DARK, capHi: C.SLATE, mortar: C.OUTLINE },
+    brick: { left: C.BLOOD_DARK, right: C.BLOOD, light: C.BLOOD_BRIGHT, cap: C.BLOOD_DARK, capHi: C.BLOOD, mortar: C.OUTLINE },
+    concrete: { left: C.ASPHALT, right: C.CONCRETE, light: C.BONE, cap: C.ASPHALT_DARK, capHi: C.ASPHALT, mortar: C.ASPHALT_DARK },
+    wood: { left: C.WOOD_DARK, right: C.WOOD, light: C.WOOD_LIGHT, cap: C.WOOD_DARK, capHi: C.WOOD, mortar: C.OUTLINE },
   }[material] || { left: C.SLATE_DARK, right: C.SLATE, light: C.STEEL, cap: C.SHADOW, capHi: C.SLATE_DARK, mortar: C.OUTLINE };
 
   // górna płaszczyzna (cienki "dach" muru)
@@ -1041,6 +1021,11 @@ function makeCharacter(opts) {
   }
 
   if (zombie) {
+    // fałdy materiału i brud
+    for (let y = 12; y <= 19; y += 3) {
+      pb.hline(cx - 3, cx + 3, y + bob, shirtShade);
+    }
+    pb.vline(cx + 1, 12 + bob, 18 + bob, shirtShade);
     // rozdarć ubrania i krwi
     pb.set(cx - 2, 13 + bob, skinShade);
     pb.set(cx + 2, 15 + bob, skin);
@@ -1330,7 +1315,7 @@ export function buildArt() {
   const zombiePalettes = [
     { shirt: C.BLUE, shirtShade: C.SLATE_DARK, pants: C.SLATE_DARK },
     { shirt: C.WOOD, shirtShade: C.WOOD_DARK, pants: C.ASPHALT_DARK },
-    { shirt: C.BONE, shirtShade: C.CONCRETE, pants: C.SLATE },
+    { shirt: C.CONCRETE, shirtShade: C.CONCRETE_DARK, pants: C.SLATE },
     { shirt: C.GRASS_DARK, shirtShade: C.GREEN_DARK, pants: C.WOOD_DARK },
     { shirt: C.BLOOD, shirtShade: C.BLOOD_DARK, pants: C.ASPHALT },
   ];

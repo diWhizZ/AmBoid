@@ -73,6 +73,37 @@ export const C = {
 
 export const TRANSPARENT = 255;
 
+// ---------------------------------------------------------------------------
+// "Pre-shaded" paleta — odpowiednik ciemniejszych wariantów kafli, które
+// przygotowuje się w DPaint na Amidze. Zamiast szachownicy przygaszamy kolor
+// przez przemapowanie indeksu na ciemniejszy odpowiednik z tej samej rodziny.
+//
+//   poziom 1 — zmierzch / świt (ok. 70% jasności)
+//   poziom 2 — noc (ok. 45% jasności)
+//   poziom 3 — pamięć mapy (obszar zbadany, poza zasięgiem wzroku)
+//   poziom 4 — teren niezbadany (ledwie widoczny zarys)
+const DIM1 = [
+  0, 1, 2, 3, 3, 4, 24, 6, 9, 10, 11, 2, 10, 11, 13, 14,
+  1, 16, 17, 19, 19, 20, 21, 23, 23, 25, 25, 26, 29, 19, 5, 3,
+];
+const DIM2 = [
+  0, 1, 1, 2, 2, 3, 23, 24, 10, 11, 1, 1, 11, 2, 11, 13,
+  1, 16, 16, 19, 19, 19, 20, 25, 26, 1, 25, 25, 29, 19, 4, 2,
+];
+const DIM3 = DIM2.map((c) => DIM2[c]);
+const DIM4 = DIM3.map(() => 1);
+
+export const DIM_TABLES = [
+  null,
+  Uint8Array.from(DIM1),
+  Uint8Array.from(DIM2),
+  Uint8Array.from(DIM3),
+  Uint8Array.from(DIM4),
+];
+
+// Procent pikseli dodatkowo rozbijanych ditheringiem (0 = brak).
+export const DIM_DITHER = [0, 0, 0.1, 0.18, 0.3];
+
 // Konwersja HEX -> [r,g,b]
 export function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);

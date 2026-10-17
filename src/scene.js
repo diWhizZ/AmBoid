@@ -224,9 +224,18 @@ export function renderWorld(game, world, cam, opts = {}) {
       const pal = art.chars.zombie[((z.variant % art.chars.zombie.length) + art.chars.zombie.length) % art.chars.zombie.length];
       const dirFrames = pal[((z.dir % 4) + 4) % 4];
       const spr = dirFrames[((frame % 2) + 2) % 2];
-      scr.blit(art.shadows.player, sx + 8, sy + 3, { dim });
+      scr.blit(art.shadows.player, sx + 8, sy + 3, { dim: 2 });
       const flash = !menu && z.flash > 0 ? C.WHITE : null;
       scr.blit(spr, sx + 6, sy - 23, { dim, flash });
+      if (game.ambientDim() > 0 && !menu) {
+        // w ciemności zombie mają słaby, czerwony błysk oczu — czytelność
+        const eye = Math.floor(tAnim * 2 + z.variant) % 2 === 0 ? C.BLOOD_BRIGHT : C.BLOOD;
+        const hy = sy - 18;
+        if (z.dir === 0 || z.dir === 2 || z.dir === 3) {
+          scr.set(sx + 8, hy, eye);
+          scr.set(sx + 12, hy, eye);
+        }
+      }
     });
   }
 
@@ -243,7 +252,7 @@ export function renderWorld(game, world, cam, opts = {}) {
       }
       const frame = p.moving ? Math.max(0, Math.floor(p.moveT / 0.12)) % 2 : 0;
       const spr = art.chars.player[((p.dir % 4) + 4) % 4][frame];
-      scr.blit(art.shadows.player, sx + 8, sy + 3, { dim });
+      scr.blit(art.shadows.player, sx + 8, sy + 3, { dim: 2 });
       scr.blit(spr, sx + 6, sy - 23, { dim });
     });
   }

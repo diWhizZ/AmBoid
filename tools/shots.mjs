@@ -39,6 +39,12 @@ game.update(0.1);
 game.render();
 save('01-tytul.png');
 
+// 1b. O projekcie
+game.mode = 'about';
+game.render();
+save('08-o-projekcie.png');
+game.mode = 'menu';
+
 // 2. Miasteczko za dnia + zombie
 game.startGame(0x5eed1);
 game.player.x = 25; game.player.y = 8;
@@ -54,7 +60,7 @@ game.render();
 save('02-miasteczko.png');
 
 // 3. Walka
-game.inventory.push({ id: 'bat', count: 1, dur: 60 });
+game.inventory.push({ id: 'bat', count: 1, dur: 42 });
 game.selected = game.inventory.length - 1;
 game.player.x = 26; game.player.y = 8; game.player.vx = 26; game.player.vy = 8;
 game.updateFOV(true);

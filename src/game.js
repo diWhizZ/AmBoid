@@ -209,10 +209,9 @@ export class Game {
 
   ambientDim() {
     const hour = (this.time % MIN_PER_DAY) / 60;
-    if (hour < 5 || hour >= 22) return 2; // noc: przygaszone, ale widoczne
-    if (hour < 7 || hour >= 19) return 2;
-    if (hour < 8 || hour >= 18) return 1;
-    return 0;
+    if (hour < 5 || hour >= 22) return 2; // noc
+    if (hour < 8 || hour >= 18) return 1; // świt / zmierzch
+    return 0; // dzień
   }
 
   fovRadius() {
@@ -235,7 +234,7 @@ export class Game {
 
   // Poziom przyciemnienia kafla: 0 = jasno, 4 = czerń. Pamięć mapy = 3.
   tileDim(x, y, vis) {
-    if (!vis) return 2; // pamięć mapy
+    if (!vis) return 3; // pamięć mapy
     const amb = this.ambientDim();
     if (amb === 0) {
       // miękka winieta na skraju zasięgu wzroku

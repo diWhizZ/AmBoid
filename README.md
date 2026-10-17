@@ -91,7 +91,7 @@ pliku PNG używanego przez grę ani pliku audio. Paleta jest zamknięta na 32 ko
 | Paleta | 5 bitplanów = 32 kolory | stała tablica 32 kolorów |
 | Izometria | 32×16 kafli | te same proporcje 2:1 |
 | Cień / mgła | dither Bayera 4×4 | matryca Bayera w rendererze |
-| Światło | przygaszanie kolorów | indeksy „ciemnych" odpowiedników + dither |
+| Światło | pre-shaded paleta | 4 tablice przemapowania indeksów + dither |
 | Dźwięk | Paula, 4 kanały | WebAudio, fale kwadratowe i szum |
 | Grafika | DPaint | atlas IFF ILBM (5 bitplanów) w `docs/amiga/` |
 

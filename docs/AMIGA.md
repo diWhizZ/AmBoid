@@ -96,11 +96,32 @@ przesunięcia poziomego** (0–15 px) albo rysujemy tylko na siatce 16 px
 i przesuwamy o pełne kafle. Rekomendacja: 8 kopii co 2 px dla postaci
 (koszt pamięci ×8, ale postacie są małe).
 
-### 4.2 Ciemność i dither
-Nie obliczamy ciemności w czasie rzeczywistym. Każdy kafel podłogi ma
-**3 warianty przygaszenia** (0, 1, 2) prefiltrowane w DPaint: oryginał,
-wersja z dither 25% i wersja z dither 50% ciemnym kolorem. Koszt pamięci
-×3, koszt CPU zerowy. To dokładnie to, co robi prototyp w `Screen.blit({dim})`.
+### 4.2 Ciemność: tablice przygaszenia (nie dither!)
+
+Pierwsza wersja prototypu przygaszała świat ditheringiem Bayera (szachownicą
+czarnego). Efekt na jasnych kaflach (chodnik, beton) był brudny i przypominał
+plamy — dokładnie ten sam problem, który pojawia się, gdy w DPaint zamiast
+ciemniejszej palety użyje się rastra.
+
+Rozwiązanie jest paletowe: **cztery tablice przemapowania indeksów**
+(`DIM_TABLES` w `src/palette.js`). Każdy indeks ma swój ciemniejszy odpowiednik
+z tej samej rodziny barw:
+
+| Kolor | Dzień | Zmierzch (1) | Noc (2) | Pamięć (3) |
+| --- | --- | --- | --- | --- |
+| trawa `21` | 21 | 20 | 19 | 19 |
+| chodnik `23` | 23 | 23 | 25 | 1 |
+| beton `24` | 24 | 23 | 26 | 1 |
+| cegła `17` | 17 | 17 | 16 | 1 |
+| niebo-szyba `31` | 31 | 3 | 2 | 2 |
+
+Na Amidze to **zero kosztu CPU**: cztery wskaźniki do tablic 32 bajtów
+i jeden `move.b (a0,d0),d1` na piksel. Dither (12–30% pikseli) stosujemy tylko
+jako dodatek na dwóch najciemniejszych poziomach, żeby rozbić pasy — nigdy
+na jasnych kaflach w dzień.
+
+Do tego dochodzą **pre-shaded tilesety**: jeśli zabraknie cykli, tablice można
+zastąpić trzema gotowymi wariantami kafli w DPaint (×3 pamięci, 0 cykli).
 
 ### 4.3 Cięcie ścian
 Prototyp wykrywa ściany „od strony kamery" i rysuje je jako płaskie posadzki

@@ -321,12 +321,12 @@ export function drawAbout(game) {
   scr.panel(8, 6, 304, 188, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
   txt(scr, 'O PROJEKCIE', 160, 13, C.YELLOW, { scale: 2, align: 'center' });
   const paragraphs = [
-    'AMBOID to fanowski hołd dla PROJECT ZOMBOID przeniesiony w realia AMIGI. Izometryczne miasteczko, zombie, głód, ciemność i deski na oknach.',
-    'Cała grafika powstaje proceduralnie w 32-kolorowej palecie. Rozdzielczość logiczna to 320x200. Dźwięki są syntezowane na żywo.',
-    'Wersja docelowa: AMIGA 500/1200 — procesor 68000, OCS/ECS, 512 KB RAM, jedna dyskietka. Ten prototyp działa w przeglądarce.',
-    'Projekt fanowski, nieoficjalny. Stworzony dla zabawy i nauki.',
+    'AMBOID to fanowski hołd dla PROJECT ZOMBOID przeniesiony w realia AMIGI. Izometryczne miasteczko, zombie, głód i deski na oknach.',
+    'Cała grafika powstaje proceduralnie w palecie 32 kolorów. Rozdzielczość to 320x200. Dźwięki są syntezowane na żywo.',
+    'Wersja docelowa: AMIGA 500/1200 — 68000, OCS/ECS, 512 KB RAM, jedna dyskietka.',
+    'Projekt fanowski, nieoficjalny. Zrobiony dla zabawy i nauki.',
   ];
-  let y = 34;
+  let y = 33;
   for (const para of paragraphs) {
     const lines = wrapText(para, 284);
     for (const line of lines) {
@@ -335,12 +335,12 @@ export function drawAbout(game) {
     }
     y += 3;
   }
-  txt(scr, 'PALETA 32 KOLORY', 160, 148, C.SLATE, { align: 'center' });
+  txt(scr, 'PALETA 32 KOLORY', 160, 141, C.SLATE, { align: 'center' });
   for (let i = 0; i < 32; i++) {
-    scr.rect(64 + i * 6, 157, 5, 8, i);
-    scr.frame(64 + i * 6, 157, 5, 8, C.OUTLINE);
+    scr.rect(64 + i * 6, 150, 5, 8, i);
+    scr.frame(64 + i * 6, 150, 5, 8, C.OUTLINE);
   }
-  button(game, 130, 176, 60, 13, 'POWRÓT', 'back', false);
+  button(game, 130, 170, 60, 13, 'POWRÓT', 'back', false);
 }
 
 // ---------------------------------------------------------------------------

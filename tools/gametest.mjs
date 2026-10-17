@@ -282,11 +282,11 @@ section('Czas, pogoda, cel');
   g.time = 12 * 60;
   check('południe jest jasne', g.ambientDim() === 0);
   g.time = 19 * 60 + 30;
-  check('zmierzch przygasa', g.ambientDim() === 2);
+  check('zmierzch przygasa', g.ambientDim() === 1);
   g.time = 23 * 60;
   check('noc jest ciemna', g.ambientDim() === 2);
   g.time = 6 * 60;
-  check('świt przygasa', g.ambientDim() === 2);
+  check('świt przygasa', g.ambientDim() === 1);
   check('noc zmniejsza zasięg widzenia', g.fovRadius() < 13);
 }
 {

@@ -1,7 +1,7 @@
 // Renderer: bufor indeksów palety -> RGBA dla canvasu.
 // Rozdzielczość logiczna 320x200 — klasyczny tryb lowres Amigi (PAL/NTSC).
 
-import { PALETTE, C, TRANSPARENT, paletteToUint32 } from './palette.js';
+import { PALETTE, C, TRANSPARENT, paletteToUint32, DIM_TABLES, DIM_DITHER } from './palette.js';
 
 export const VIEW_W = 320;
 export const VIEW_H = 200;
@@ -127,14 +127,16 @@ export class Screen {
    * opts.flash: indeks koloru — rysuje sylwetkę (np. błysk trafienia)
    */
   blit(sprite, x, y, opts = {}) {
-    const dim = opts.dim || 0;
+    const dim = Math.max(0, Math.min(4, opts.dim || 0));
     const flash = opts.flash == null ? null : opts.flash;
     const src = sprite.data;
     const sw = sprite.w;
     const sh = sprite.h;
     const ox = Math.round(x);
     const oy = Math.round(y);
-    const threshold = dim * 4;
+    const table = dim > 0 ? DIM_TABLES[dim] : null;
+    // dodatkowy dither rozbijający pasy na poziomie 2 i 3
+    const dither = dim > 0 ? (DIM_DITHER[dim] * 16) | 0 : 0;
     for (let sy = 0; sy < sh; sy++) {
       const py = oy + sy;
       if (py < 0 || py >= this.h) continue;
@@ -144,9 +146,8 @@ export class Screen {
         if (px < 0 || px >= this.w) continue;
         let c = src[sy * sw + sx];
         if (c === TRANSPARENT) continue;
-        if (dim > 0 && BAYER[(py & 3) * 4 + (px & 3)] < threshold) {
-          c = dim >= 3 ? C.OUTLINE : C.SHADOW;
-        }
+        if (table) c = table[c];
+        if (dither > 0 && BAYER[(py & 3) * 4 + (px & 3)] < dither) c = C.OUTLINE;
         if (flash != null) c = flash;
         this.data[row + px] = c;
       }
