@@ -36,13 +36,28 @@ const MOVE_CODES = {
   KeyD: 'right',
   ArrowRight: 'right',
 };
-// W trybie izometrycznym ekranowe „lewo" to na mapie (−x, +y), a „prawo" (+x, −y).
-// Wcześniej lewo i prawo były zamienione — A szło w prawo, D w lewo.
-const MOVES = {
-  up: { dx: -1, dy: -1, dir: 1 },
-  down: { dx: 1, dy: 1, dir: 0 },
-  left: { dx: -1, dy: 1, dir: 2 },
-  right: { dx: 1, dy: -1, dir: 3 },
+// Dwa schematy sterowania. Domyślny „ekran": W góra, S dół, A lewo, D prawo.
+// „Izo": pojedynczy klawisz idzie po skosie ekranu (W góra-lewo, D góra-prawo,
+// S dół-prawo, A dół-lewo), a dwa sąsiednie klawisze dają ruch po osi ekranu.
+const CONTROL_SCHEMES = {
+  screen: {
+    label: 'EKRAN',
+    moves: {
+      up: { dx: -1, dy: -1, dir: 1 },
+      down: { dx: 1, dy: 1, dir: 0 },
+      left: { dx: -1, dy: 1, dir: 2 },
+      right: { dx: 1, dy: -1, dir: 3 },
+    },
+  },
+  iso: {
+    label: 'IZO',
+    moves: {
+      up: { dx: -1, dy: 0, dir: 1 },
+      down: { dx: 1, dy: 0, dir: 0 },
+      left: { dx: 0, dy: 1, dir: 2 },
+      right: { dx: 0, dy: -1, dir: 3 },
+    },
+  },
 };
 
 const ACTIONS = ['Space', 'KeyE', 'KeyQ', 'KeyF', 'KeyM', 'KeyH', 'Escape', 'Enter'];
@@ -81,6 +96,13 @@ export class Game {
     this.profileId = getProfile(savedProfile || 'aga').id;
     this.profile = getProfile(this.profileId);
     if (this.screen) this.screen.setProfile(this.profile);
+    let savedScheme = null;
+    try {
+      if (typeof localStorage !== 'undefined') savedScheme = localStorage.getItem('amboid.controls');
+    } catch (e) {
+      /* brak dostępu do localStorage */
+    }
+    this.controlScheme = CONTROL_SCHEMES[savedScheme] ? savedScheme : 'screen';
     this.createMenuWorld();
   }
 
@@ -123,21 +145,53 @@ export class Game {
     return profile;
   }
 
+  setControlScheme(id, silent = false) {
+    if (!CONTROL_SCHEMES[id]) return this.controlScheme;
+    this.controlScheme = id;
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('amboid.controls', id);
+    } catch (e) {
+      /* brak dostępu do localStorage */
+    }
+    if (!silent) {
+      this.msg(`STEROWANIE: ${CONTROL_SCHEMES[id].label}`, C.YELLOW);
+    }
+    this.keys.clear();
+    this.moveStack = [];
+    return id;
+  }
+
+  toggleControlScheme() {
+    const next = this.controlScheme === 'screen' ? 'iso' : 'screen';
+    this.setControlScheme(next);
+    this.audio.play('click');
+    return next;
+  }
+
+  // LB/RB na padzie: poprzedni/następny slot ekwipunku.
+  cycleSlot(dir = 1) {
+    const cap = this.capacity();
+    if (!cap) return this.selected;
+    this.selected = (this.selected + dir + cap) % cap;
+    this.audio.play('click');
+    return this.selected;
+  }
+
   // Mnożnik jasności dla trybu RTG (prawdziwe światło zamiast tablic palety).
   ambientFactor() {
     const amb = this.ambientDim();
-    let f = amb === 0 ? 1 : amb === 1 ? 0.78 : 0.46;
-    if (this.weather === 'overcast') f -= 0.05;
-    if (this.weather === 'rain') f -= 0.09;
-    return Math.max(0.3, Math.min(1, f));
+    let f = amb === 0 ? 1 : amb === 1 ? 0.64 : 0.36;
+    if (this.weather === 'overcast') f -= 0.04;
+    if (this.weather === 'rain') f -= 0.07;
+    return Math.max(0.24, Math.min(1, f));
   }
 
   // Barwa światła otoczenia: noc chłodzi obraz w stronę granatu.
   ambientTint() {
     const amb = this.ambientDim();
     if (amb === 0) return [1, 1, 1];
-    if (amb === 1) return [0.92, 0.94, 1.04];
-    return [0.74, 0.82, 1.12];
+    if (amb === 1) return [0.86, 0.89, 1.03];
+    return [0.6, 0.72, 1.12];
   }
 
   // Lista świateł RTG w pikselach ekranu (0..320 / 0..200).
@@ -152,26 +206,42 @@ export class Game {
       if (lamp.y < bounds.y0 - 5 || lamp.y > bounds.y1 + 5) continue;
       const [sx, sy] = cam.toScreen(lamp.x, lamp.y);
       const flicker = 0.94 + Math.sin(this.t * 5.1 + lamp.x * 1.7) * 0.06;
-      const strength = amb > 0 ? 0.48 : 0.14;
+      const strength = amb > 0 ? 0.38 : 0.1;
       lights.push({
         sx: sx + 16,
         sy: sy - 4,
-        r: 3.2 * 32,
+        r: 2.5 * 32,
         i: strength * flicker,
         color: [255, 168, 82],
+      });
+      // mniejsza, jaśniejsza poświata u szczytu latarni — efekt „żarówki"
+      lights.push({
+        sx: sx + 16,
+        sy: sy - 22,
+        r: 26,
+        i: strength * 0.5 * flicker,
+        color: [255, 214, 150],
       });
     }
     const p = this.player;
     const [px, py] = cam.toScreen(p.vx, p.vy);
     if (p.flashlightOn) {
-      const radius = (this.currentFovRadius || 9) * 20;
+      const radius = Math.min(250, (this.currentFovRadius || 9) * 24);
+      // stożek w stronę, w którą patrzy gracz (0 dół, 1 góra, 2 lewo, 3 prawo)
+      const fx = p.dir === 2 ? -1 : p.dir === 3 ? 1 : 0;
+      const fy = p.dir === 0 ? 1 : p.dir === 1 ? -1 : 0;
       lights.push({
         sx: px + 16,
         sy: py - 4,
         r: radius,
-        i: 0.5,
+        i: 0.46,
         color: [255, 240, 198],
+        dirX: fx,
+        dirY: fy,
+        spread: 0.58,
       });
+      // krótka poświata wokół gracza, żeby stożek nie zaczynał się z czerni
+      lights.push({ sx: px + 16, sy: py - 4, r: 64, i: 0.16, color: [255, 240, 198] });
     } else if (amb > 0) {
       lights.push({ sx: px + 16, sy: py - 4, r: 2.2 * 32, i: 0.22, color: [170, 190, 255] });
     }
@@ -466,11 +536,12 @@ export class Game {
       if (this.keys.has(code) && MOVE_CODES[code]) dirs.add(MOVE_CODES[code]);
     }
     if (!dirs.size) return null;
+    const moves = CONTROL_SCHEMES[this.controlScheme].moves;
     let dx = 0;
     let dy = 0;
     for (const d of dirs) {
-      dx += MOVES[d].dx;
-      dy += MOVES[d].dy;
+      dx += moves[d].dx;
+      dy += moves[d].dy;
     }
     dx = Math.sign(dx);
     dy = Math.sign(dy);
@@ -1589,12 +1660,14 @@ export class Game {
           { label: 'JAK GRAĆ', action: 'help' },
           { label: 'O PROJEKCIE', action: 'about' },
           { label: `GRAFIKA: ${this.profile.label}`, action: 'graphics' },
+          { label: `STEROWANIE: ${CONTROL_SCHEMES[this.controlScheme].label}`, action: 'controls' },
           { label: 'PEŁNY EKRAN', action: 'fullscreen' },
         ];
       case 'paused':
         return [
           { label: 'WRÓĆ DO GRY', action: 'resume' },
           { label: 'STEROWANIE', action: 'pausedHelp' },
+          { label: `STEROWANIE: ${CONTROL_SCHEMES[this.controlScheme].label}`, action: 'controls' },
           { label: `GRAFIKA: ${this.profile.label}`, action: 'graphics' },
           { label: 'NOWA GRA', action: 'restart' },
           { label: 'MENU GŁÓWNE', action: 'menu' },
@@ -1663,6 +1736,9 @@ export class Game {
       case 'graphics':
         this.cycleProfile();
         break;
+      case 'controls':
+        this.toggleControlScheme();
+        break;
       case 'fullscreen':
         this.toggleFullscreen();
         break;
@@ -1687,6 +1763,10 @@ export class Game {
     // wejścia zamiast kopii w kilku gałęziach.
     if (code === 'KeyG' && !repeat) {
       this.cycleProfile();
+      return true;
+    }
+    if (code === 'KeyK' && !repeat) {
+      this.toggleControlScheme();
       return true;
     }
     if (repeat && !MOVE_CODES[code]) return true;

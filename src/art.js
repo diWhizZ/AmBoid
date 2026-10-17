@@ -72,7 +72,7 @@ function makeGround(kind, variant) {
       if (mask.get(x, y) === TRANSPARENT) continue;
       const n = hash2(x + variant * 37, y + variant * 91, kind.length);
       const gx = (x - y * 2 + TILE_H) / (TILE_W + TILE_H);
-      let tone = Math.floor(gx * 3.4 + (n - 0.5) * 1.5 + 0.35);
+      let tone = Math.floor(gx * 2.4 + (n - 0.5) * 2.0 + 0.4);
       if (tone < 0) tone = 0;
       else if (tone > 4) tone = 4;
       pb.set(x, y, ramp[tone]);
@@ -1336,7 +1336,7 @@ export function buildArt() {
   art.chars.player = [];
   for (let dir = 0; dir < 4; dir++) {
     art.chars.player[dir] = [0, 1].map((frame) =>
-      makeCharacter({ dir, frame, shirt: C.BLUE, shirtShade: C.SLATE_DARK, pants: C.SLATE_DARK, backpack: true }),
+      makeCharacter({ dir, frame, shirt: C.GOLD, shirtShade: C.WOOD_DARK, pants: C.SLATE_DARK, backpack: true }),
     );
   }
 

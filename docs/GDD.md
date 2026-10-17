@@ -1,6 +1,6 @@
 # AMBOID — dokument projektowy (GDD)
 
-Wersja 0.2 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
+Wersja 0.2.2 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
 
 ---
 
@@ -97,6 +97,15 @@ Po wygranej można grać dalej — tryb nieskończony.
 **Ruch:** 8 kierunków, krok co 0,22 s (bieg 0,15 s, skradanie 0,40 s, okno ×2).
 Każdy krok generuje hałas: bieg 6 kafli, chód 3,2, skradanie 1,2.
 
+**Dwa schematy sterowania (klawisz K).** Izometria 2:1 nie ma jednego
+oczywistego mapowania WASD, więc gra daje wybór: **EKRAN** (W góra, S dół,
+A lewo, D prawo) i **IZO** (W ↖, D ↗, S ↘, A ↙). Dwa sąsiednie klawisze dają
+ruch po osi ekranu. Wybór jest pamiętany w `localStorage['amboid.controls']`.
+
+**Pad:** Gamepad API mapuje lewą gałkę i D-pad na ruch, A na atak, B na akcję,
+X na użycie, Y na latarkę, LB/RB na sloty, LT/RT na skradanie/bieg,
+Back na mapę, Start na pauzę.
+
 **Doświadczenie:** +2 XP za trafienie, +4 za zabicie; co 12 XP poziom walki
 (+2 obrażeń bazowych). Czasopisma dają +6 XP.
 
@@ -191,13 +200,15 @@ z głupich decyzji**. Presja pochodzi z nocy i hordy, nie z pustych sklepów.
 
 ## 9. Interfejs
 
-- **Lewy górny:** HP (czerwony), energia (żółty), głód (zielony), pragnienie
-  (niebieski) — ikony 7×7 i paski.
+- **Lewy górny:** portret ocalałego (reaguje na HP, krwawienie i zakażenie),
+  HP (czerwony), energia (żółty), głód (zielony), pragnienie (niebieski) —
+  ikony 7×7 i paski.
 - **Prawy górny:** dzień, zegar, pogoda (ikona), cel (pozostały czas).
 - **Środek dołu:** pasek akcji (przeszukiwanie), podpowiedź interakcji („E ..."),
   nazwa wybranego przedmiotu + stan broni.
 - **Dół:** 10–15 slotów ekwipunku z ikonami i licznikami.
-- **Komunikaty:** maks. 2 linie w lewym górnym rogu, po 6 s każdy.
+- **Komunikaty:** maks. 2 linie tuż pod panelem statusu, po 6 s każdy;
+  nie zasłaniają już pasków HP.
 - **Mapa (M):** siatka 4 px/kafel, tylko zbadany teren; żółty = gracz.
 - **Ekrany:** tytuł, pomoc, o projekcie, pauza, mapa, śmierć (statystyki), wygrana.
 
@@ -226,7 +237,8 @@ Ziarno pozwala powtórzyć dokładnie to samo miasteczko.
   „ziemi" (zieleń, brąz), 5 metali, 4 kolory krwi, 4 skóry, 4 neutralne,
   żółty UI, niebieski woda. OCS mapuje półtony na bazę.
 - **Tryby grafiki:** OCS 32, AGA 64 (tablice przygaszenia) i RTG (chunky 8-bit,
-  światło RGB: ciepłe latarnie, zimna noc, latarka).
+  światło RGB: ciepłe latarnie, zimna noc, stożek latarki i poświata żarówki).
+  Noc w RTG ma niebieski ambient i lokalne źródła światła, a nie globalne koło.
 - **Font:** 5×7 px, ręcznie rysowany, z polskimi diakrytykami (glif bazowy +
   kropka/kreska/ogonek). Skala 1× i 2×.
 - **Ciemność:** 4 tablice przemapowania indeksów (dzień / zmierzch / noc / pamięć) +
@@ -254,8 +266,12 @@ Ziarno pozwala powtórzyć dokładnie to samo miasteczko.
 **v0.1 (ten prototyp)** — grywalna pętla, 12 budynków, walka, łupy, noc, horda,
 deski, mapa, ekrany końca, eksport IFF/AMB.
 
-**v0.2** — więcej typów budynków (kościół, szkoła, bar), pojazd jako schronienie,
-alarm samochodowy, więcej broni, ręczne poprawki atlasów w DPaint.
+**v0.2.2** — schematy ruchu EKRAN/IZO (K), obsługa pada (Gamepad API),
+stożek latarki i halo latarni w RTG, portret w HUD, rozbryzgi deszczu,
+komunikaty pod panelem statusu. Plan grafiki: `docs/GRAFIKA.md`.
+
+**v0.2.x** — więcej typów budynków (kościół, szkoła, bar), pojazd jako schronienie,
+alarm samochodowy, więcej broni, autotile krawędzi i więcej wariantów kafli.
 
 **v1.0 (Amiga)** — patrz `docs/AMIGA.md`: silnik 68030 w C, dwa backendy
 (planar AGA i chunky RTG), dane `.amb` na HDD/CF, 25–50 fps w 320×200/64 kolory

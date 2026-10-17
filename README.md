@@ -61,7 +61,7 @@ Opcjonalnie własne miasteczko i tryb grafiki:
 
 | Klawisz | Akcja |
 | --- | --- |
-| `W A S D` / strzałki | ruch w 8 kierunkach |
+| `W A S D` / strzałki | ruch (schemat EKRAN lub IZO — patrz niżej) |
 | `Shift` / `Ctrl` | bieg / skradanie |
 | `Spacja` / LPM | atak |
 | `E` | drzwi, przeszukanie, podniesienie łupu, zabicie okna |
@@ -69,7 +69,35 @@ Opcjonalnie własne miasteczko i tryb grafiki:
 | `1`–`0` | wybór slotu |
 | `F` / `M` / `H` | latarka / mapa / pomoc |
 | `G` | przełącz tryb grafiki: OCS 32 → AGA 64 → RTG |
+| `K` | przełącz schemat ruchu: **EKRAN** ↔ **IZO** |
 | `Esc` | pauza |
+
+**Dwa schematy ruchu.** Izometria 2:1 nie ma jednej „oczywistej” strzałki —
+dlatego są dwa schematy, a wybór zapisuje się w przeglądarce:
+
+| Schemat | Pojedynczy klawisz idzie… | Dla kogo |
+| --- | --- | --- |
+| **EKRAN** (domyślny) | W góra, S dół, A lewo, D prawo — dokładnie jak na ekranie | większość graczy |
+| **IZO** | po skosie: W ↖, D ↗, S ↘, A ↙ jak w klasycznych grach izo | gdy wolisz „chodzić po krawędziach” kafli |
+
+W obu schematach dwa sąsiednie klawisze dają ruch po osi ekranu (np. w IZO
+`S`+`D` idzie w prawo, a `W`+`A` w lewo). Schemat zmienisz też w menu:
+`STEROWANIE: EKRAN` / `STEROWANIE: IZO`.
+
+**Pad (Gamepad API).** Podłączony pad działa od razu, bez konfiguracji
+(Chrome, Edge, Firefox; tryb XInput):
+
+| Pad | Akcja |
+| --- | --- |
+| lewa gałka / D-pad | ruch i nawigacja w menu |
+| **A** / krzyżyk | atak, zatwierdzenie |
+| **B** / kółko | interakcja (`E`) |
+| **X** / kwadrat | użyj przedmiotu (`Q`) |
+| **Y** / trójkąt | latarka (`F`) |
+| **LB** / **RB** | poprzedni / następny slot |
+| **LT** / **RT** | skradanie / bieg |
+| **Back** | mapa |
+| **Start** | pauza / powrót |
 
 ## Co jest w grze
 
@@ -77,7 +105,8 @@ Opcjonalnie własne miasteczko i tryb grafiki:
   magazyn, przychodnia, stacja paliw), meble, samochody, płoty, trupy.
   To samo ziarno = to samo miasto.
 - **Cykl dnia i nocy** — zmierzch, noc, latarnie uliczne, latarka, deszcz i chmury.
-  Zasięg widzenia zależy od pory dnia i pogody (FOV z raycastingiem po kaflach).
+  W RTG światło liczone jest naprawdę: stożek latarki, ciepłe halo latarni i
+  niebieska noc. Zasięg widzenia zależy od pory dnia i pogody (FOV po kaflach).
 - **Zombie** — 40+ na start, horda co noc o 21:00. Reagują na hałas, gonią po
   linii wzroku, wyłamują drzwi i rwą deski z okien.
 - **Survival** — HP, energia, głód, pragnienie, krwawienie, zakażenie od ugryzień.
@@ -89,7 +118,10 @@ Opcjonalnie własne miasteczko i tryb grafiki:
 
 Cała grafika i dźwięk powstają **proceduralnie** — w repozytorium nie ma ani jednego
 pliku PNG używanego przez grę ani pliku audio. Paleta bazowa ma 32 kolory, a AGA
-dokłada 32 półtony; OCS mapuje je z powrotem na bazę.
+dokłada 32 półtony; OCS mapuje je z powrotem na bazę. HUD ma portret ocalałego,
+który zmienia się wraz z ranami i zakażeniem, a nocne niebo przechodzi w granat.
+
+Co dalej z grafiką — konkretny, wyceniony plan: **[docs/GRAFIKA.md](docs/GRAFIKA.md)**.
 
 ## Trzy tryby grafiki
 

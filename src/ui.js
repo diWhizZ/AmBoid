@@ -98,14 +98,49 @@ export function drawTitle(game) {
   scr.rect(90, 100, 140, 77, C.SHADOW);
   scr.frame(89, 99, 142, 79, C.SLATE);
   scr.frame(91, 101, 138, 75, C.OUTLINE);
-  menuList(game, 97, 106, 126, 12, 2);
+  menuList(game, 97, 104, 126, 10, 2);
 
   // --- stopka ---
   scr.rect(46, 177, 228, 11, C.SHADOW);
   scr.frame(45, 176, 230, 13, C.SLATE_DARK);
-  txt(scr, 'STRZAŁKI + ENTER  ·  G ZMIENIA TRYB', tx, 179, C.BONE, { align: 'center' });
+  txt(scr, 'STRZAŁKI + ENTER · G GRAFIKA · K SCHEMAT', tx, 179, C.BONE, { align: 'center' });
   scr.rect(287, 190, 30, 8, C.SHADOW);
-  txt(scr, 'V0.2.1', 315, 191, C.SLATE, { align: 'right' });
+  txt(scr, 'V0.2.2', 315, 191, C.SLATE, { align: 'right' });
+}
+
+// Mały portret ocalałego w HUD — twarz zmienia się wraz ze stanem gracza.
+function drawPortrait(scr, x, y, p) {
+  const health = p.hp / Math.max(1, p.maxHp);
+  scr.panel(x, y, 18, 18, { fill: C.SHADOW, border: C.SLATE_DARK, inner: C.OUTLINE });
+  // ramiona i ubranie
+  scr.rect(x + 2, y + 13, 14, 3, C.GOLD);
+  scr.rect(x + 2, y + 13, 3, 3, C.WOOD_DARK);
+  scr.rect(x + 13, y + 13, 3, 3, C.WOOD_DARK);
+  // szyja
+  scr.rect(x + 7, y + 11, 4, 2, C.SKIN_DARK);
+  // twarz
+  scr.rect(x + 4, y + 4, 10, 8, C.SKIN);
+  scr.rect(x + 4, y + 10, 10, 2, C.SKIN_DARK);
+  // włosy
+  scr.rect(x + 4, y + 3, 10, 2, C.WOOD_DARK);
+  scr.rect(x + 3, y + 4, 2, 4, C.WOOD_DARK);
+  scr.rect(x + 13, y + 4, 2, 4, C.WOOD_DARK);
+  // oczy i nos
+  scr.set(x + 6, y + 7, health < 0.35 ? C.BLOOD_DARK : C.OUTLINE);
+  scr.set(x + 11, y + 7, health < 0.35 ? C.BLOOD_DARK : C.OUTLINE);
+  scr.set(x + 8, y + 8, C.SKIN_DARK);
+  scr.set(x + 9, y + 8, C.SKIN_DARK);
+  // usta
+  scr.rect(x + 7, y + 10, 4, 1, C.WOOD_DARK);
+  if (health < 0.5) scr.set(x + 4, y + 9, C.BLOOD);
+  if (health < 0.25) {
+    scr.set(x + 5, y + 10, C.BLOOD_DARK);
+    scr.set(x + 12, y + 8, C.BLOOD_DARK);
+  }
+  if (p.infected) {
+    scr.set(x + 13, y + 10, C.GRASS_DARK);
+    scr.set(x + 12, y + 11, C.ZOMBIE_SKIN);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +148,9 @@ export function drawHUD(game) {
   const scr = game.screen;
   const p = game.player;
 
-  // --- status ---
-  scr.panel(3, 3, 104, 44, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
+  // --- status + portret ---
+  scr.panel(3, 3, 124, 44, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
+  drawPortrait(scr, 106, 7, p);
   const stats = [
     ['heart', p.hp / p.maxHp, C.BLOOD],
     ['bolt', p.energy / 100, C.YELLOW],
@@ -148,23 +184,23 @@ export function drawHUD(game) {
   txt(scr, game.weatherLabel(), 226, 17, game.weather === 'rain' ? C.STEEL : C.BONE);
   txt(scr, game.goalText(), 215, 26, C.YELLOW);
 
-  // --- komunikaty (na ciemnym tle, u góry) ---
+  // --- komunikaty (pod panelem statusu, żeby nie zasłaniały HUD) ---
   const msgs = game.messages.filter((m) => m.t > 0).slice(-2);
   if (msgs.length) {
     let maxW = 0;
     for (const m of msgs) maxW = Math.max(maxW, textWidth(m.text));
     maxW = Math.min(maxW, 250);
-    scr.rect(3, 40, maxW + 9, msgs.length * 9 + 3, C.SHADOW);
-    scr.frame(3, 40, maxW + 9, msgs.length * 9 + 3, C.OUTLINE);
-    msgs.forEach((m, i) => txt(scr, fit(m.text, maxW), 7, 42 + i * 9, m.color));
+    scr.rect(3, 50, maxW + 9, msgs.length * 9 + 3, C.SHADOW);
+    scr.frame(3, 50, maxW + 9, msgs.length * 9 + 3, C.OUTLINE);
+    msgs.forEach((m, i) => txt(scr, fit(m.text, maxW), 7, 52 + i * 9, m.color));
   }
 
   // --- pasek akcji ---
   if (p.action) {
-    scr.panel(112, 56, 96, 16, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
-    txt(scr, 'PRZESZUKUJĘ...', 160, 58, C.YELLOW, { align: 'center' });
+    scr.panel(112, 74, 96, 16, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
+    txt(scr, 'PRZESZUKUJĘ...', 160, 76, C.YELLOW, { align: 'center' });
     const pct = Math.min(1, p.action.t / p.action.dur);
-    bar(scr, 116, 67, 88, 3, pct, C.GOLD);
+    bar(scr, 116, 85, 88, 3, pct, C.GOLD);
   }
 
   // --- podpowiedź akcji ---
@@ -277,6 +313,7 @@ export function drawHelp(game) {
     ['SKRADANIE', 'CTRL'],
     ['ATAK', 'SPACJA / LPM'],
     ['AKCJA / WEŹ', 'E'],
+    ['SCHEMAT', 'K'],
   ];
   const right = [
     ['UŻYJ', 'Q'],
@@ -469,5 +506,12 @@ export function drawRain(game, force = false) {
     const color = i % 5 === 0 ? C.BONE : i % 3 === 0 ? C.STEEL : C.SLATE;
     scr.line(x, y, x - 1, y + 3, color);
     if (i % 7 === 0) scr.line(x - 2, y + 5, x - 3, y + 7, color);
+    // rozbryzgi na ziemi — kropla uderza i rozpryskuje się w dwie kropki
+    if (i % 9 === 0) {
+      const gy = ((i * 71 + Math.floor(t * 120)) % 190) + 8;
+      scr.set(x + 3, gy, C.STEEL);
+      scr.set(x + 1, gy - 1, C.SLATE_DARK);
+      scr.set(x + 5, gy - 1, C.SLATE_DARK);
+    }
   }
 }

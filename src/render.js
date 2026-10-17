@@ -214,7 +214,22 @@ export class Screen {
     const h = this.h;
     const L = [];
     for (const l of lights) {
-      L.push({ x: l.sx, y: l.sy, r: l.r, r2: l.r * l.r, i: l.i, cr: l.color[0], cg: l.color[1], cb: l.color[2] });
+      const spread = l.spread != null ? l.spread : null;
+      L.push({
+        x: l.sx,
+        y: l.sy,
+        r: l.r,
+        r2: l.r * l.r,
+        i: l.i,
+        cr: l.color[0],
+        cg: l.color[1],
+        cb: l.color[2],
+        // światło kierunkowe (latarka): stożek z miękką krawędzią
+        dx: l.dirX != null ? l.dirX : 0,
+        dy: l.dirY != null ? l.dirY : 0,
+        coned: spread != null,
+        cosEdge: spread != null ? Math.cos(spread) : -1,
+      });
     }
     for (let y = 0; y < h; y++) {
       const dy2base = y * 2;
@@ -237,6 +252,14 @@ export class Screen {
           if (d2 >= l.r2) continue;
           let f = 1 - d2 / l.r2;
           f = f * f * f * l.i;
+          if (l.coned) {
+            const inv = 1 / Math.sqrt(d2);
+            const dot = (dx * l.dx + dy * l.dy) * inv;
+            if (dot <= l.cosEdge) continue;
+            let edge = (dot - l.cosEdge) / (1 - l.cosEdge);
+            edge = edge * edge * (3 - 2 * edge);
+            f *= edge;
+          }
           r += l.cr * f;
           g += l.cg * f;
           b += l.cb * f;

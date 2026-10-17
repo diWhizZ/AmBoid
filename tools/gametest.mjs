@@ -4,6 +4,7 @@ import { Screen, isoX, isoY } from '../src/render.js';
 import { Game } from '../src/game.js';
 import { World } from '../src/world.js';
 import { ITEMS } from '../src/items.js';
+import { GamepadInput, STICK_DEADZONE } from '../src/gamepad.js';
 
 const stub = { muted: false, init() {}, play() {}, setRain() {}, setMuted() {}, toggleMute() { return true; } };
 const art = buildArt();
@@ -188,6 +189,152 @@ section('Kierunki ruchu i przełącznik grafiki');
   check('G przełącza AGA -> RTG', p1 === 'aga' && g.profileId === 'rtg');
   g.keyDown('KeyG');
   check('G przełącza RTG -> OCS', g.profileId === 'ocs');
+}
+
+section('Schematy sterowania (K)');
+{
+  const g = newGame();
+  g.world.zombies = [];
+  // ten sam otwarty plac co wyżej
+  let spot = null;
+  for (let y = 2; y < g.world.h - 2 && !spot; y++) {
+    for (let x = 2; x < g.world.w - 2; x++) {
+      if (!g.world.isWalkable(x, y)) continue;
+      const ok = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1], [1, 1], [-1, -1]].every(
+        ([dx, dy]) => g.world.isWalkable(x + dx, y + dy),
+      );
+      if (ok) { spot = { x, y }; break; }
+    }
+  }
+  const measure = (code) => {
+    teleport(g, spot.x, spot.y);
+    g.keys.clear();
+    g.moveStack = [];
+    const x0 = isoX(g.player.vx, g.player.vy);
+    const y0 = isoY(g.player.vx, g.player.vy);
+    walkOne(g, code);
+    return [isoX(g.player.vx, g.player.vy) - x0, isoY(g.player.vx, g.player.vy) - y0];
+  };
+  check('domyślny schemat to EKRAN', g.controlScheme === 'screen');
+  g.mode = 'menu';
+  check('menu pokazuje pozycję STEROWANIE', g.menuItems().some((it) => it.action === 'controls'));
+  g.mode = 'playing';
+  const s0 = g.controlScheme;
+  g.keyDown('KeyK');
+  check('K przełącza EKRAN -> IZO', s0 === 'screen' && g.controlScheme === 'iso');
+  g.keyDown('KeyK');
+  check('K przełącza IZO -> EKRAN', g.controlScheme === 'screen');
+  g.setControlScheme('iso');
+  const [ax, ay] = measure('KeyA');
+  const [dx, dy] = measure('KeyD');
+  const [wx, wy] = measure('KeyW');
+  const [sx, sy] = measure('KeyS');
+  check('IZO: W idzie po skosie w górę-lewo', wx < 0 && wy < 0, `ekran ${wx},${wy}`);
+  check('IZO: S idzie po skosie w dół-prawo', sx > 0 && sy > 0, `ekran ${sx},${sy}`);
+  check('IZO: A idzie po skosie w dół-lewo', ax < 0 && ay > 0, `ekran ${ax},${ay}`);
+  check('IZO: D idzie po skosie w górę-prawo', dx > 0 && dy < 0, `ekran ${dx},${dy}`);
+  // dwa klawisze po tej samej stronie rombu dają czysty ruch poziomy ekranu
+  const combo = (k1, k2) => {
+    teleport(g, spot.x, spot.y);
+    g.keys.clear();
+    g.moveStack = [];
+    const x0 = isoX(g.player.vx, g.player.vy);
+    const y0 = isoY(g.player.vx, g.player.vy);
+    g.keyDown(k1);
+    g.keyDown(k2);
+    for (let i = 0; i < 40 && !g.player.moving; i++) g.update(1 / 60);
+    for (let i = 0; i < 60 && g.player.moving; i++) g.update(1 / 60);
+    g.keyUp(k1);
+    g.keyUp(k2);
+    return [isoX(g.player.vx, g.player.vy) - x0, isoY(g.player.vx, g.player.vy) - y0];
+  };
+  const [rdx, rdy] = combo('KeyS', 'KeyD');
+  check('IZO: S+D idzie poziomo w prawo', rdx > 0 && Math.abs(rdy) <= 8, `ekran ${rdx},${rdy}`);
+  const [ldx, ldy] = combo('KeyW', 'KeyA');
+  check('IZO: W+A idzie poziomo w lewo', ldx < 0 && Math.abs(ldy) <= 8, `ekran ${ldx},${ldy}`);
+  g.setControlScheme('screen');
+}
+
+section('Obsługa pada (Gamepad API)');
+{
+  const g = newGame();
+  g.world.zombies = [];
+  const pad = (axes = [0, 0], pressed = []) => ({
+    id: 'Test Pad (STANDARD GAMEPAD)',
+    connected: true,
+    axes,
+    buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: pressed.includes(i), value: pressed.includes(i) ? 1 : 0 })),
+  });
+  const gp = new GamepadInput();
+  check('brak pada nie blokuje gry', gp.poll(g, [null]) === false);
+  let spot = null;
+  for (let y = 2; y < g.world.h - 2 && !spot; y++) {
+    for (let x = 2; x < g.world.w - 2; x++) {
+      if (!g.world.isWalkable(x, y)) continue;
+      if ([1, -1].every((dx) => g.world.isWalkable(x + dx, y))) { spot = { x, y }; break; }
+    }
+  }
+  // D-pad w prawo: jeden krok po jednym wciśnięciu
+  teleport(g, spot.x, spot.y);
+  g.keys.clear();
+  g.moveStack = [];
+  const x0 = g.player.x;
+  const y0 = g.player.y;
+  gp.poll(g, [pad([0, 0], [15])]);
+  for (let i = 0; i < 100 && (g.player.moving || g.player.x === x0); i++) g.update(1 / 60);
+  gp.poll(g, [pad()]);
+  check('D-pad w prawo rusza gracza', g.player.x !== x0 || g.player.y !== y0, `${x0},${y0} -> ${g.player.x},${g.player.y}`);
+  check('D-pad nie powtarza ruchu po puszczeniu', g.player.moving === false);
+  // gałka: martwa strefa
+  teleport(g, spot.x, spot.y);
+  g.keys.clear();
+  g.moveStack = [];
+  gp.poll(g, [pad([STICK_DEADZONE * 0.5, 0], [])]);
+  check('gałka w martwej strefie nie rusza gracza', g.keys.size === 0);
+  gp.poll(g, [pad([0, 0], [])]);
+  // gałka w lewo = krok w lewo (schemat ekranowy)
+  teleport(g, spot.x, spot.y);
+  g.keys.clear();
+  g.moveStack = [];
+  const x1 = g.player.x;
+  const y1 = g.player.y;
+  gp.poll(g, [pad([-1, 0], [])]);
+  for (let i = 0; i < 100 && (g.player.moving || g.player.x === x1); i++) g.update(1 / 60);
+  gp.poll(g, [pad([0, 0], [])]);
+  check('gałka w lewo rusza gracza', g.player.x !== x1 || g.player.y !== y1);
+  // A = atak (Space)
+  g.player.attackCd = 0;
+  g.mode = 'playing';
+  const before = g.effects.length;
+  gp.poll(g, [pad([0, 0], [0])]);
+  check('przycisk A wywołuje atak', g.effects.length > before || g.player.attackCd > 0);
+  gp.poll(g, [pad([0, 0], [])]);
+  // B = interakcja (E) — otwiera drzwi
+  const b = g.world.buildings[0];
+  teleport(g, b.doorX, b.doorY - 1);
+  g.keys.clear();
+  g.moveStack = [];
+  gp.poll(g, [pad([0, 0], [1])]);
+  check('przycisk B otwiera drzwi', g.world.tile(b.doorX, b.doorY).wall.open);
+  gp.poll(g, [pad([0, 0], [])]);
+  // Start = pauza, powtórny Start = powrót do gry
+  g.mode = 'playing';
+  gp.poll(g, [pad([0, 0], [9])]);
+  check('Start pauzuje grę', g.mode === 'paused');
+  gp.poll(g, [pad([0, 0], [])]);
+  gp.poll(g, [pad([0, 0], [9])]);
+  check('Start wznawia grę', g.mode === 'playing');
+  gp.poll(g, [pad([0, 0], [])]);
+  // RB przeskakuje slot
+  g.selected = 0;
+  g.capacity = () => 3;
+  gp.poll(g, [pad([0, 0], [5])]);
+  check('RB wybiera następny slot', g.selected === 1, `slot ${g.selected}`);
+  gp.poll(g, [pad([0, 0], [])]);
+  // odłączenie pada czyści wciśnięte klawisze
+  gp.poll(g, [pad([0, 0], [12])]);
+  gp.poll(g, [null]);
+  check('odłączenie pada puszcza wszystkie klawisze', g.keys.size === 0 && gp.pressed.size === 0);
 }
 
 section('Interakcje i łupy');
@@ -433,7 +580,7 @@ section('Interfejs i ekrany');
   }
   g.toMenu();
   g.render();
-  check('menu ma przyciski', g.buttons.length === 5);
+  check('menu ma przyciski', g.buttons.length === 6);
   check('menu rysuje podgląd miasta', g.screen.data.some((v) => v !== 0));
 }
 {
@@ -489,6 +636,12 @@ section('Tryby graficzne OCS / AGA / RTG');
   g.updateFOV(true);
   const lights = g.getLights();
   check('RTG ma światło gracza i latarnie', lights.length >= 1 && lights.some((l) => l.r > 100));
+  const torch = lights.find((l) => l.spread != null);
+  check('latarka w RTG ma stożek', !!torch && torch.r > 100);
+  g.player.dir = 3;
+  const torchRight = g.getLights().find((l) => l.spread != null);
+  check('stożek obraca się z graczem', !!torchRight && torchRight.dirX === 1 && torchRight.dirY === 0);
+  g.player.dir = 0;
   check('RTG przygasza światło otoczenia nocą', g.ambientFactor() < 0.6 && g.ambientFactor() >= 0.2);
   g.mode = 'playing';
   g.render();

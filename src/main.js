@@ -4,6 +4,7 @@ import { buildArt } from './art.js';
 import { Screen, VIEW_W, VIEW_H } from './render.js';
 import { GameAudio } from './audio.js';
 import { Game } from './game.js';
+import { GamepadInput } from './gamepad.js';
 
 const canvas = document.getElementById('screen');
 canvas.width = VIEW_W;
@@ -15,6 +16,7 @@ const screen = new Screen(VIEW_W, VIEW_H);
 const art = buildArt();
 const audio = new GameAudio();
 const game = new Game(screen, art, audio);
+const gamepad = new GamepadInput();
 
 // opcjonalny seed z adresu: ?seed=ABC123
 try {
@@ -31,7 +33,7 @@ try {
 }
 
 window.AMBOID = game;
-console.log('AMBOID v0.2.1 — tryby grafiki: OCS 32 / AGA 64 / RTG RGB (klawisz G)');
+console.log('AMBOID v0.2.2 — grafika: G (OCS/AGA/RTG), sterowanie: K (EKRAN/IZO), pad: Gamepad API');
 
 const image = ctx.createImageData(VIEW_W, VIEW_H);
 const out32 = new Uint32Array(image.data.buffer);
@@ -65,6 +67,11 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   game.keyUp(e.code);
 });
+
+window.addEventListener('gamepadconnected', (e) => {
+  const name = (e.gamepad && e.gamepad.id ? e.gamepad.id : 'PAD').slice(0, 34);
+  game.msg(`KONTROLER: ${name}`);
+});
 window.addEventListener('blur', () => game.clearKeys());
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -80,6 +87,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
+  if (typeof navigator.getGamepads === 'function') gamepad.poll(game, navigator.getGamepads());
   game.update(dt);
   game.render();
   game.present();

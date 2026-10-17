@@ -45,6 +45,10 @@ globalThis.window = {
     (listeners['win:' + type] ||= []).push(cb);
   },
 };
+Object.defineProperty(globalThis, 'navigator', {
+  value: { getGamepads: () => (globalThis.__pad ? [globalThis.__pad] : []) },
+  configurable: true,
+});
 globalThis.requestAnimationFrame = (cb) => {
   rafCb = cb;
   return 1;
@@ -110,9 +114,33 @@ console.log('mode after Esc from help:', window.AMBOID.mode);
 
 // kliknięcie w ekran (atak)
 for (const cb of listeners['canvas:pointerdown'] || []) {
-  cb({ preventDefault() {}, clientX: 160, clientY: 100 });
+  cb({ preventDefault() {}, clientX: 20, clientY: 190 });
 }
 frames(2);
+
+// pad: D-pad w lewo przesuwa gracza, puszczenie zatrzymuje
+window.AMBOID.mode = 'playing';
+const pad = (pressedIndex) => ({
+  id: 'Stub Pad', connected: true, axes: [0, 0],
+  buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: i === pressedIndex, value: i === pressedIndex ? 1 : 0 })),
+});
+const px0 = window.AMBOID.player.x;
+const py0 = window.AMBOID.player.y;
+// wybierz kierunek, w którym nie ma ściany (schemat ekranowy)
+const dirs = [[14, -1, 1], [15, 1, -1], [12, -1, -1], [13, 1, 1]];
+const [btn] = dirs.find(([, dx, dy]) => window.AMBOID.world.isWalkable(px0 + dx, py0 + dy)) || [14];
+console.log('pad test start:', px0, py0, 'button', btn);
+globalThis.__pad = pad(btn);
+frames(40);
+globalThis.__pad = pad(-1);
+frames(5);
+console.log('mode after pad:', window.AMBOID.mode);
+console.log('player after pad:', window.AMBOID.player.x, window.AMBOID.player.y);
+console.log('pad moved player:', window.AMBOID.player.x !== px0 || window.AMBOID.player.y !== py0);
+if (window.AMBOID.player.x === px0 && window.AMBOID.player.y === py0) {
+  console.error('BROWSER-STUB FAIL: pad nie ruszył gracza');
+  process.exitCode = 1;
+}
 
 // resize
 for (const cb of listeners['win:resize'] || []) cb();
@@ -127,6 +155,7 @@ for (let i = 0; i < data.length; i += 4) {
   const key = `${data[i]},${data[i + 1]},${data[i + 2]}`;
   if (!allowed.has(key)) bad++;
 }
+
 console.log('pixels outside palette:', bad, '/', data.length / 4);
 if (bad > 0) { console.error('BROWSER-STUB FAIL: kolory spoza palety 64'); process.exitCode = 1; }
 console.log('total putImageData:', putCount);

@@ -47,7 +47,10 @@ z domyślnymi opcjami wystarczy).
 
 ### Wariant B — ZIP (bez Gita)
 
-1. Otwórz **https://github.com/diWhizZ/AmBoid**.
+Pobierasz **gałąź roboczą** z wersją 0.2.2 (po scaleniu PR #1 to samo będzie
+w `main`).
+
+1. Otwórz **https://github.com/diWhizZ/AmBoid/tree/arena/cb222f77-amboid**.
 2. Zielony przycisk **Code** → **Download ZIP**.
 3. Kliknij prawym na pobrany plik → **Properties** → zaznacz **Unblock** → OK
    (opcjonalnie, ale ułatwia uruchamianie skryptów).
@@ -69,15 +72,22 @@ Powinny być m.in. `index.html`, `package.json`, `src`, `tools`, `docs`.
 
 ### Masz starszy ZIP? Aktualizacja bez Gita
 
-Wersję poznasz po pliku `src\profiles.js` i panelu **„GRAFIKA: AGA 64 KOLORY"**
-na ekranie tytułowym. Jeśli ich nie ma, to stary build bez trybu AGA/RTG
-i klawisz **G** nie zadziała.
+Wersję 0.2.2 poznasz po pliku `src\gamepad.js` i pozycji **`STEROWANIE: EKRAN`**
+w menu głównym oraz po klawiszu **K**. Jeśli ich nie ma — masz stary build.
 
-1. Wejdź na **https://github.com/diWhizZ/AmBoid/tree/arena/cb222f77-amboid**.
-2. **Code → Download ZIP**.
-3. Rozpakuj do **nowego** folderu, np. `D:\Gry\AmBoid-021`.
-4. Uruchom tam `node tools/serve.mjs` (albo `npm.cmd start`).
-5. Sprawdź w konsoli przeglądarki (F12) komunikat `AMBOID v0.2.1…`.
+Najszybciej, bez Gita i bez klikania:
+
+```powershell
+$zip = "$env:USERPROFILE\Downloads\AmBoid-022.zip"
+Invoke-WebRequest "https://github.com/diWhizZ/AmBoid/archive/refs/heads/arena/cb222f77-amboid.zip" -OutFile $zip
+Expand-Archive $zip -DestinationPath "D:\Gry\AmBoid-022" -Force
+cd "D:\Gry\AmBoid-022\AmBoid-arena-cb222f77-amboid"
+node tools\serve.mjs
+```
+
+Potem otwórz `http://localhost:8080` i sprawdź w konsoli (F12) komunikat
+`AMBOID v0.2.2…`. Jeśli `Expand-Archive` zgłosi błąd ścieżki, usuń `-Force`
+i rozpakuj do nieistniejącego jeszcze folderu.
 
 ---
 
@@ -159,6 +169,16 @@ http://localhost:8080/?gfx=rtg&seed=ABC123
 **Sterowanie:** `WASD`/strzałki — ruch, `Shift` — bieg, `Ctrl` — skradanie,
 `Spacja`/LPM — atak, `E` — akcja, `Q` — użyj, `1–0` — sloty, `F` — latarka,
 `M` — mapa, `H` — pomoc, `Esc` — pauza, `G` — tryb grafiki.
+
+**Schemat ruchu (klawisz `K`).** Jeśli `A`/`D` wydają się „nie w tę stronę”,
+naciśnij **K** — przełączysz ruch z trybu **EKRAN** (W góra, S dół, A lewo,
+D prawo) na **IZO** (klawisze chodzą po skosie: W ↖, D ↗, S ↘, A ↙). Wybór
+zapamiętuje się w przeglądarce, a w menu widać go jako `STEROWANIE: EKRAN/IZO`.
+
+**Pad.** Podłącz kontroler w trybie XInput i naciśnij dowolny przycisk;
+gra pokaże `KONTROLER: …`. Gałka lub D-pad — ruch, A — atak, B — akcja,
+X — użyj, Y — latarka, LB/RB — slot, LT/RT — skradanie/bieg, Back — mapa,
+Start — pauza.
 
 Dźwięk startuje po pierwszym kliknięciu w planszę (taka polityka przeglądarek).
 
@@ -247,7 +267,9 @@ punkt 1 lub 3 zadziała zawsze.
 | Pusta/biała strona | otwarto `file://` zamiast `http://localhost:8080`; odśwież Ctrl+F5 |
 | `EADDRINUSE` / port zajęty | zmień port: `$env:PORT=8081; npm start` |
 | Brak dźwięku | kliknij najpierw w planszę gry |
-| `G` nie zmienia grafiki | stary ZIP bez `src\profiles.js` — pobierz wersję 0.2.1 (sekcja 2) |
+| `G` nie zmienia grafiki | stary ZIP bez `src\profiles.js` — pobierz wersję 0.2.2 (sekcja 2) |
+| `A`/`D` idą „nie w tę stronę” | naciśnij **K** i wybierz schemat IZO; to różnica interpretacji izometrii, nie błąd klawisza |
+| Pad nie reaguje | kliknij planszę (przeglądarki blokują wejście do momentu interakcji), sprawdź tryb XInput i odśwież stronę z podłączonym padem |
 | Gra pamięta tryb RTG i wygląda ciemno | to noc w RTG — wciśnij **G**, aby wrócić do AGA, albo zagraj do rana |
 | Obraz rozmyty | ustaw zoom przeglądarki na 100% (Ctrl+0); gra skaluje piksele całkowitą wielokrotnością |
 | Firewall blokuje podgląd z innego urządzenia | zezwól Node.js w zaporze dla sieci prywatnej |
