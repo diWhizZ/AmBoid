@@ -27,6 +27,19 @@ nie przez problematyczne `gh pr edit`. Linki do pobrania:
 - https://github.com/diWhizZ/AmBoid/releases/download/v0.2.4/AmBoid-0.2.4.zip
 - https://github.com/diWhizZ/AmBoid/archive/refs/heads/main.zip
 
+## Wynik publikacji w tej sesji
+
+- PR #2 scalony: main `20f7bff` zawiera v0.2.4, 204 OK / 0 FAIL.
+- Release i tag v0.2.4 istnieją. GitHub ZIP tagu pobrano i zweryfikowano.
+- **Brakuje nazwanego assetu AmBoid-0.2.4.zip**: `gh release create` z plikiem
+  nie może połączyć się z `uploads.github.com` (EOF). Sam Release bez assetu utworzony.
+- Próba publikacji workflow odrzucona przez GitHub App: brak `workflows` permission.
+- Gotowy workflow zapisany jako `docs/RELEASE-ZIP.workflow.yml` (nieaktywny),
+  instrukcja w `docs/PUBLIKACJA.md`. Nie próbuj ponownie pushować go do .github
+  bez poszerzenia uprawnień. Żadnych tokenów ani haseł w czacie.
+- Działające pobieranie: https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.4.zip
+- **Etapy 4 i 5 nie zostały rozpoczęte** — najpierw dokończ asset Release.
+
 ## SPEC v0.2.4
 
 - Ekran, HUD, menu, kursor i `isOverHud` zawsze **320×200**.

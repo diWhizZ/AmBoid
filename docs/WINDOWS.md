@@ -7,14 +7,21 @@ Tryb OCS 32 jest wyłącznie zgodnością; domyślny profil to AGA.
 ## 1. Pobierz i rozpakuj
 
 - [Release v0.2.4](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.4)
-- **[AmBoid-0.2.4.zip](https://github.com/diWhizZ/AmBoid/releases/download/v0.2.4/AmBoid-0.2.4.zip)** — stała wersja
+- **[ZIP źródeł v0.2.4](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.4.zip)** — stała wersja, dostępny teraz
 - [main.zip](https://github.com/diWhizZ/AmBoid/archive/refs/heads/main.zip) — najnowszy stan po scaleniu PR
 
-Nie potrzebujesz Gita. Rozpakuj **zawartość ZIP-a Release** do:
+Nie potrzebujesz Gita. ZIP tagu ma podfolder `AmBoid-0.2.4`; rozpakuj go do
+`D:\pobrane\zomboid`, żeby otrzymać:
 `D:\pobrane\zomboid\AmBoid-0.2.4`.
 W tym folderze mają być od razu `index.html`, `package.json`, `src`, `tools`, `docs`.
 Nie uruchamiaj projektu wewnątrz archiwum ani w `C:\WINDOWS\system32`.
 Archiwum `main.zip` ma własny podfolder `AmBoid-main` — wejdź do niego.
+
+Na stronie Release można też pobrać **Source code (zip)** — to ten sam tag.
+Osobny asset o nazwie `AmBoid-0.2.4.zip` nie został jeszcze dołączony z powodu
+blokady `uploads.github.com` i braku uprawnienia `workflows` połączenia Arena.
+Nie potrzebujesz tego assetu, aby uruchomić grę z ZIP-a tagu.
+[Szczegóły publikacji](PUBLIKACJA.md).
 
 ## 2. Uruchom — bez npm i bez zmiany ExecutionPolicy
 

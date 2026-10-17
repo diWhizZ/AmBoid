@@ -1,0 +1,70 @@
+name: Release ZIP
+
+# Pakowanie po stronie GitHuba: nie wymaga dostępu lokalnego klienta do
+# uploads.github.com. Tag/release tworzymy przed uruchomieniem workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Istniejący tag Release, np. v0.2.4'
+        required: true
+        default: v0.2.4
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-zip-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install test dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test tagged source
+        run: npm test
+      - name: Package source (no Git, dependencies or scratch files)
+        id: zip
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, re, zipfile
+          from pathlib import Path
+          version = json.loads(Path('package.json').read_text())['version']
+          tag = os.environ['RELEASE_TAG']
+          assert re.fullmatch(r'v\d+\.\d+\.\d+', tag), 'Invalid release tag'
+          assert tag == 'v' + version, 'Tag and package version differ'
+          filename = f'AmBoid-{version}.zip'
+          root = os.getcwd()
+          with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as z:
+              for base, dirs, files in os.walk(root):
+                  dirs[:] = sorted(d for d in dirs if d not in ('.git', 'node_modules', 'shots'))
+                  for f in sorted(files):
+                      if f == filename:
+                          continue
+                      p = os.path.join(base, f)
+                      z.write(p, os.path.relpath(p, root))
+          with zipfile.ZipFile(filename) as z:
+              assert z.testzip() is None
+              assert json.loads(z.read('package.json'))['version'] == version
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'file={filename}\n')
+          print(filename, os.path.getsize(filename), 'bytes')
+          PY
+      - name: Attach ZIP to existing Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZIP_FILE: ${{ steps.zip.outputs.file }}
+        run: gh release upload "$RELEASE_TAG" "$ZIP_FILE" --repo "$GITHUB_REPOSITORY" --clobber
