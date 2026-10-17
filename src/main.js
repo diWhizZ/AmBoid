@@ -33,7 +33,7 @@ try {
 }
 
 window.AMBOID = game;
-console.log('AMBOID v0.2.2 — grafika: G (OCS/AGA/RTG), sterowanie: K (EKRAN/IZO), pad: Gamepad API');
+console.log('AMBOID v0.2.3 — mysz: LPM idź / PPM atak, grafika: G, sterowanie: K, pad: Gamepad API');
 
 const image = ctx.createImageData(VIEW_W, VIEW_H);
 const out32 = new Uint32Array(image.data.buffer);
@@ -72,15 +72,44 @@ window.addEventListener('gamepadconnected', (e) => {
   const name = (e.gamepad && e.gamepad.id ? e.gamepad.id : 'PAD').slice(0, 34);
   game.msg(`KONTROLER: ${name}`);
 });
-window.addEventListener('blur', () => game.clearKeys());
+window.addEventListener('blur', () => {
+  game.clearKeys();
+  game.releaseMouse();
+});
+
+// Pozycja kursora w pikselach logicznych — przez aktualny rozmiar ekranu,
+// żeby działała też po zmianie rozdzielczości (etap 3).
+function pointerPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((e.clientX - rect.left) / rect.width) * screen.w,
+    y: ((e.clientY - rect.top) / rect.height) * screen.h,
+  };
+}
+
+canvas.addEventListener('pointermove', (e) => {
+  const p = pointerPos(e);
+  game.pointerMove(p.x, p.y);
+});
 
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
-  const rect = canvas.getBoundingClientRect();
-  const x = ((e.clientX - rect.left) / rect.width) * VIEW_W;
-  const y = ((e.clientY - rect.top) / rect.height) * VIEW_H;
-  game.click(x, y);
+  const p = pointerPos(e);
+  // przechwycenie wskaźnika: upuszczenie przycisku poza płótnem też dotrze
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch (err) {
+    /* starsze przeglądarki */
+  }
+  game.pointerDown(p.x, p.y, e.button);
 });
+
+window.addEventListener('pointerup', (e) => {
+  const p = pointerPos(e);
+  game.pointerUp(p.x, p.y, e.button);
+});
+
+canvas.addEventListener('pointercancel', () => game.releaseMouse());
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 let last = performance.now();
@@ -91,6 +120,10 @@ function frame(now) {
   game.update(dt);
   game.render();
   game.present();
+  // W grze rysujemy własny celownik, ale dopiero gdy mysz była już użyta —
+  // przy starcie z klawiatury kursor systemowy musi pozostać widoczny.
+  const wantCursor = game.mode === 'playing' && game.mouse.active ? 'none' : 'default';
+  if (canvas.style.cursor !== wantCursor) canvas.style.cursor = wantCursor;
   out32.set(screen.u32);
   ctx.putImageData(image, 0, 0);
   requestAnimationFrame(frame);

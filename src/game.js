@@ -7,7 +7,7 @@ import { C } from './palette.js';
 import { ITEMS, CONTAINER_NAMES } from './items.js';
 import { makeRng, hash2 } from './rng.js';
 import { getProfile, nextProfile } from './profiles.js';
-import { renderWorld, renderEffects } from './scene.js';
+import { renderWorld, renderEffects, renderOrders } from './scene.js';
 import {
   drawHUD,
   drawTitle,
@@ -18,6 +18,7 @@ import {
   drawDead,
   drawWon,
   drawRain,
+  drawCursor,
 } from './ui.js';
 
 const START_TIME = 8 * 60; // 08:00
@@ -25,6 +26,64 @@ const MIN_PER_DAY = 1440;
 const GAME_MIN_PER_SEC = 5;
 // Cel: przetrwać dwie pełne doby — od 08:00 dnia 1 do 08:00 dnia 3 (48 h).
 const WIN_AT = START_TIME + 2 * MIN_PER_DAY;
+
+// --- Sterowanie myszą (etap 1: kursor, klik-idź, push-scroll) -------------
+const NEIGH8 = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+  [1, 1], [1, -1], [-1, 1], [-1, -1],
+];
+const PATH_MAX = 90;           // maks. długość ścieżki (kafli)
+const PATH_BUDGET = 4000;      // maks. liczba zdjętych węzłów A*
+const MOUSE_DEADZONE_X = 36;   // martwa strefa kamery (px)
+const MOUSE_DEADZONE_Y = 22;
+const MOUSE_LEAD_MAX_X = 46;   // maks. wyprzedzenie kamery (px)
+const MOUSE_LEAD_MAX_Y = 30;
+const HOLD_REPATH = 0.12;      // jak często trzymany LPM przelicza trasę
+
+// Prosty kopiec binarny do A* — bez zależności i bez sortowania całej listy.
+class PathHeap {
+  constructor() {
+    this.a = [];
+  }
+  get size() {
+    return this.a.length;
+  }
+  push(x, y, f) {
+    const a = this.a;
+    a.push({ x, y, f });
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p].f <= a[i].f) break;
+      const t = a[p];
+      a[p] = a[i];
+      a[i] = t;
+      i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = i * 2 + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < a.length && a[l].f < a[m].f) m = l;
+        if (r < a.length && a[r].f < a[m].f) m = r;
+        if (m === i) break;
+        const t = a[m];
+        a[m] = a[i];
+        a[i] = t;
+        i = m;
+      }
+    }
+    return top;
+  }
+}
 
 const MOVE_CODES = {
   KeyW: 'up',
@@ -106,6 +165,17 @@ export class Game {
     // Wektor z pada w przestrzeni ekranu; ma pierwszeństwo przed klawiszami
     // i nie zależy od wybranego schematu (gałka w lewo = zawsze w lewo).
     this.padVector = null;
+    // Mysz: pozycja w pikselach logicznych + stan przycisków i podgląd celu.
+    this.mouse = { x: 0, y: 0, active: false };
+    this.mouseLeftHeld = false;
+    this.mouseRightHeld = false;
+    this.hover = null;
+    this.leadX = 0;
+    this.leadY = 0;
+    this._orderMsgT = 0;
+    this._holdT = 0;
+    this._lastHoldX = null;
+    this._lastHoldY = null;
     this.createMenuWorld();
   }
 
@@ -301,6 +371,9 @@ export class Game {
       xp: 0,
       sprinting: false,
       sneaking: false,
+      // Rozkazy myszy: ścieżka (kolejne kafle) + cel po dojściu.
+      path: [],
+      order: null,
     };
     this.camera.follow(this.player.vx, this.player.vy);
     this.inventory = [
@@ -316,6 +389,18 @@ export class Game {
     this.hordeNight = -1;
     this.lastDay = 1;
     this.victoryShown = false;
+    this.hover = null;
+    this.leadX = 0;
+    this.leadY = 0;
+    this.mouseLeftHeld = false;
+    this.mouseRightHeld = false;
+    this._holdT = 0;
+    this._lastHoldX = null;
+    this._lastHoldY = null;
+    if (this.camera) {
+      this.camera.lookX = 0;
+      this.camera.lookY = 0;
+    }
     this.infectionStage = 0;
     this.messages = [];
     this.effects = [];
@@ -333,8 +418,8 @@ export class Game {
     this.mode = 'playing';
     this.audio.setRain(false);
     this.msg('CEL: PRZETRWAJ 2 DOBY', C.YELLOW);
-    this.msg('E OTWIERA DRZWI / Q UŻYWA', C.BONE);
-    this.msg('ZNALEŹ COŚ DO OBRONY', C.BONE);
+    this.msg('MYSZ: LPM IDŹ · HOLD = PODĄŻAJ', C.BONE);
+    this.msg('PPM ATAK · E AKCJA · Q UŻYJ', C.BONE);
   }
 
   toMenu() {
@@ -359,7 +444,11 @@ export class Game {
     this.checkTimeEvents(before, this.time);
     this.updateWeather(dt);
     this.updateFOV();
+    this.updateMouseHold(dt);
+    this.updateCameraLead(dt);
     this.updatePlayer(dt);
+    // Hover po kamerze: podświetlenie kafla musi zgadzać się z klatką.
+    this.updateHover();
     this.updateZombies(dt);
     this.updateStatus(dt);
     this.updateEffects(dt);
@@ -443,11 +532,16 @@ export class Game {
   // -------------------------------------------------------------------------
   updatePlayer(dt) {
     const p = this.player;
+    if (!p) return;
     p.attackCd = Math.max(0, p.attackCd - dt);
+
+    const moveInput = this.getMoveVector();
+    // Klawiatura/pad anulują rozkaz myszy. Nowy rozkaz robi to sam w issueMoveOrder.
+    if (moveInput && (p.path.length || p.order)) this.clearOrders(false);
 
     if (p.action) {
       p.action.t += dt;
-      if (this.getMoveVector()) {
+      if (moveInput) {
         p.action = null;
       } else if (p.action.t >= p.action.dur) {
         const act = p.action;
@@ -473,6 +567,7 @@ export class Game {
         this.stats.steps++;
         this.updateFOV(true);
         this.onPlayerArrive();
+        this.arriveOrder();
       }
       this.camera.follow(p.vx, p.vy);
       return;
@@ -481,7 +576,11 @@ export class Game {
     this.camera.follow(p.vx, p.vy);
 
     if (p.action) return;
-    const dir = this.getMoveVector();
+
+    // Kolejny krok ścieżki wyznaczonej myszą (jeśli jest).
+    if (this.stepAlongPath()) return;
+
+    const dir = moveInput;
     if (!dir) return;
     const nx = p.x + dir.dx;
     const ny = p.y + dir.dy;
@@ -492,11 +591,17 @@ export class Game {
     if (this.zombiesAt(nx, ny)) {
       return;
     }
+    this.startStep(nx, ny, dir.dir);
+  }
+
+  // Wspólny start animowanego kroku dla klawiatury, pada i ścieżki myszy.
+  startStep(nx, ny, facing = null) {
+    const p = this.player;
     p.fromX = p.x;
     p.fromY = p.y;
     p.toX = nx;
     p.toY = ny;
-    p.dir = dir.dir;
+    p.dir = facing == null ? this.facingFromDelta(nx - p.x, ny - p.y) : facing;
     p.moving = true;
     p.moveT = 0;
     const cost = this.world.moveCost(nx, ny);
@@ -1141,7 +1246,7 @@ export class Game {
   }
 
   // -------------------------------------------------------------------------
-  tryAttack() {
+  tryAttack(opts = {}) {
     if (this.mode !== 'playing' || !this.player.alive) return;
     const p = this.player;
     if (p.attackCd > 0) return;
@@ -1149,7 +1254,7 @@ export class Game {
     const item = this.selectedItem();
     const def = item ? ITEMS[item.id] : null;
     if (def && def.type === 'weapon' && def.ranged) {
-      this.fireGun(item);
+      this.fireGun(item, opts);
       return;
     }
     const weapon = def && def.type === 'weapon' ? item : null;
@@ -1158,8 +1263,13 @@ export class Game {
     const range = wdef ? wdef.range : 1.4;
     const cd = wdef ? wdef.cooldown : 0.5;
     p.attackCd = cd;
-    const target = this.findAttackTarget(range, true);
+    // Cel wskazany myszą ma pierwszeństwo. Przy ataku myszą „brak celu”
+    // oznacza cios w powietrze, a nie auto-namierzenie zombie obok.
+    const target = opts.explicit
+      ? opts.target
+      : opts.target || this.findAttackTarget(range, true);
     if (target) p.dir = this.facingFromDelta(target.x - p.x, target.y - p.y);
+    else if (opts.dir != null) p.dir = opts.dir;
     this.effects.push({ type: 'swing', dir: p.dir, t: 0, dur: 0.18 });
     this.audio.play('swing');
     this.emitNoise(p.x, p.y, wdef ? wdef.noise : 0.8);
@@ -1177,7 +1287,7 @@ export class Game {
     }
   }
 
-  fireGun(item) {
+  fireGun(item, opts = {}) {
     const p = this.player;
     const def = ITEMS[item.id];
     if (!this.hasItem('ammo')) {
@@ -1190,7 +1300,10 @@ export class Game {
     this.stats.shots++;
     this.audio.play('gun');
     this.emitNoise(p.x, p.y, def.noise);
-    const target = this.findAttackTarget(def.range, true);
+    const target = opts.explicit
+      ? opts.target
+      : opts.target || this.findAttackTarget(def.range, true);
+    if (!target && opts.dir != null) p.dir = opts.dir;
     let toX = p.x;
     let toY = p.y;
     if (target) {
@@ -1359,6 +1472,12 @@ export class Game {
       this.msg('NIC TU NIE MA', C.BONE);
       return;
     }
+    this.performInteraction(it);
+  }
+
+  // Wykonanie konkretnej interakcji — wspólne dla E i rozkazów myszy.
+  performInteraction(it) {
+    if (!it) return;
     if (it.kind === 'item') {
       this.pickUp(it.rec);
     } else if (it.kind === 'container') {
@@ -1715,6 +1834,8 @@ export class Game {
       case 'resume':
         this.mode = 'playing';
         this.menuIndex = 0;
+        // klik „wróć do gry” nie może zamienić się w rozkaz pod przyciskiem
+        this.releaseMouse();
         break;
       case 'menu':
         this.toMenu();
@@ -1737,11 +1858,13 @@ export class Game {
       case 'back':
         this.mode = this.helpReturn === 'paused' ? 'paused' : this.helpBg === 'menu' ? 'menu' : 'playing';
         this.menuIndex = 0;
+        this.releaseMouse();
         break;
       case 'continue':
         this.mode = 'playing';
         this.victoryShown = true;
         this.menuIndex = 0;
+        this.releaseMouse();
         break;
       case 'mute': {
         const muted = this.audio.toggleMute();
@@ -1896,7 +2019,9 @@ export class Game {
 
   click(x, y) {
     this.audio.init();
-    if (this.buttons.length) {
+    // Przyciski menu działają tylko poza grą. W trybie 'playing' stara lista
+    // przycisków (np. z pauzy) nie może przechwycić kliknięcia w świat.
+    if (this.mode !== 'playing' && this.buttons.length) {
       for (const b of this.buttons) {
         if (x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h) {
           this.menuAction(b.action);
@@ -1908,21 +2033,518 @@ export class Game {
       // pasek ekwipunku
       const slots = this.capacity();
       const hx = 10;
-      const hy = 169;
+      const hy = 166;
       if (y >= hy && y < hy + 20 && x >= hx && x < hx + slots * 20) {
         const i = Math.floor((x - hx) / 20);
         if (i < slots) this.selectSlot(i);
         return;
       }
-      this.tryAttack();
+      // Klik w panel HUD nie wydaje rozkazu.
+      if (this.isOverHud(x, y)) return;
+      // PPM przytrzymany + LPM = użycie przedmiotu.
+      if (this.mouseRightHeld) {
+        this.useSelected();
+        return;
+      }
+      this.issueMoveOrder(x, y);
     } else if (this.mode === 'map') {
       // klik zamyka mapę
       this.mode = 'playing';
       this.audio.play('click');
+      this.releaseMouse();
     }
   }
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Mysz: kursor, rozkazy klik-idź, podgląd ścieżki, push-scroll kamery.
+  // ---------------------------------------------------------------------------
+  isOverHud(x, y) {
+    const w = this.screen ? this.screen.w : VIEW_W;
+    const h = this.screen ? this.screen.h : VIEW_H;
+    // dolny pasek: etykieta przedmiotu, sloty i stopka
+    if (y >= h - 48) return true;
+    // panel statusu i zegar
+    if (y < 48 && (x < 132 || x > w - 112)) return true;
+    // pasek akcji rysowany tylko podczas przeszukiwania
+    if (this.player && this.player.action && x >= 108 && x < 212 && y >= 70 && y < 94) return true;
+    return false;
+  }
+
+  pointerMove(x, y) {
+    this.mouse.x = x;
+    this.mouse.y = y;
+    this.mouse.active = true;
+  }
+
+  pointerDown(x, y, button = 0) {
+    this.audio.init();
+    this.pointerMove(x, y);
+    if (button === 2) {
+      this.mouseRightHeld = true;
+      this.rightClick(x, y);
+      return;
+    }
+    if (button !== 0) return;
+    this.mouseLeftHeld = true;
+    this.click(x, y);
+  }
+
+  pointerUp(x, y, button = 0) {
+    if (button === 0) {
+      this.mouseLeftHeld = false;
+      this._holdT = 0;
+      this._lastHoldX = null;
+      this._lastHoldY = null;
+    } else if (button === 2) {
+      this.mouseRightHeld = false;
+    }
+  }
+
+  releaseMouse() {
+    this.mouseLeftHeld = false;
+    this.mouseRightHeld = false;
+    this._holdT = 0;
+    this._lastHoldX = null;
+    this._lastHoldY = null;
+  }
+
+  rightClick(x, y) {
+    if (this.mode === 'map') {
+      this.mode = 'playing';
+      this.audio.play('click');
+      this.releaseMouse();
+      return;
+    }
+    if (this.mode !== 'playing' || !this.player) return;
+    if (this.isOverHud(x, y)) return;
+    if (this.mouseLeftHeld) {
+      this.useSelected();
+      return;
+    }
+    this.mouseAttack(x, y);
+  }
+
+  // Atak w kierunku kursora: cel najbliżej kursora (w zasięgu i z widocznością),
+  // a gdy go nie ma — cios/strzał w stronę kliknięcia.
+  mouseAttack(x, y) {
+    const p = this.player;
+    if (!p || !p.alive || this.mode !== 'playing') return;
+    const [tx, ty] = this.camera.tileAtScreen(x, y);
+    let dir = null;
+    if (Number.isFinite(tx) && Number.isFinite(ty) && (tx !== p.x || ty !== p.y)) {
+      dir = this.facingFromDelta(tx - p.x, ty - p.y);
+    }
+    const def = this.selectedDef();
+    const range = def && def.type === 'weapon' ? def.range : 1.4;
+    const target = this.findAttackTargetAt(tx, ty, range, true);
+    this.tryAttack({ target, dir, explicit: true });
+  }
+
+  findAttackTargetAt(tx, ty, range, requireLOS = true) {
+    const p = this.player;
+    let best = null;
+    let bestD = Infinity;
+    for (const z of this.world.zombies) {
+      if (!z.alive) continue;
+      if (Math.hypot(z.x - p.x, z.y - p.y) > range) continue;
+      if (requireLOS && !this.world.lineOfSight(p.x, p.y, z.x, z.y)) continue;
+      const cd = Math.hypot(z.x - tx, z.y - ty);
+      // cel musi być blisko kursora — inaczej bijemy w powietrze w stronę kliknięcia
+      if (cd > 2.6 || cd >= bestD) continue;
+      best = z;
+      bestD = cd;
+    }
+    return best;
+  }
+
+  clearOrders(resetAction = true) {
+    const p = this.player;
+    if (p) {
+      p.path = [];
+      p.order = null;
+      if (resetAction) p.action = null;
+    }
+    this.pathGoal = null;
+    this._lastHoldX = null;
+    this._lastHoldY = null;
+  }
+
+  orderFeedback(text) {
+    if (this.t < (this._orderMsgT || 0)) return null;
+    this._orderMsgT = this.t + 1.1;
+    this.msg(text, C.BLOOD);
+    return null;
+  }
+
+  // Wydanie rozkazu LPM. Zwraca opis celu (dla testów) albo null.
+  issueMoveOrder(x, y) {
+    if (this.mode !== 'playing' || !this.world || !this.player) return null;
+    const p = this.player;
+    const [tx, ty] = this.camera.tileAtScreen(x, y);
+    if (!this.world.inBounds(tx, ty)) return null;
+
+    // 1) Zombie: podejdź i stań obok, ale NIE atakuj automatycznie.
+    const zombie = this.world.zombies.find((z) => z.alive && z.x === tx && z.y === ty);
+    if (zombie) {
+      const path = this.findPath(tx, ty, { adjacent: true });
+      if (!path) {
+        this.audio.play('bump');
+        return this.orderFeedback('NIE DOJDĘ TAM');
+      }
+      this.clearOrders();
+      p.path = path;
+      p.order = { kind: 'face', x: tx, y: ty };
+      this.pathGoal = { x: tx, y: ty };
+      this.audio.play('click');
+      this.arriveOrder();
+      return { kind: 'face', x: tx, y: ty };
+    }
+
+    // 2) Obiekt interaktywny: podejdź i wykonaj jedną konkretną akcję.
+    const it = this.interactionAt(tx, ty);
+    if (it) {
+      const sameTile = it.kind === 'item' && this.world.isWalkable(tx, ty);
+      const path = sameTile
+        ? this.findPath(tx, ty, {})
+        : this.findPath(tx, ty, { adjacent: true });
+      if (!path) {
+        this.audio.play('bump');
+        return this.orderFeedback('NIE DOJDĘ TAM');
+      }
+      this.clearOrders();
+      p.path = path;
+      p.order = { kind: 'interact', x: tx, y: ty };
+      this.pathGoal = { x: tx, y: ty };
+      this.audio.play('click');
+      this.arriveOrder();
+      return { kind: 'interact', x: tx, y: ty };
+    }
+
+    // 3) Zwykła ziemia — idź do kafla.
+    if (!this.world.isWalkable(tx, ty)) {
+      this.audio.play('bump');
+      return this.orderFeedback('NIE MOŻNA TAM WEJŚĆ');
+    }
+    const path = this.findPath(tx, ty, {});
+    if (!path) {
+      this.audio.play('bump');
+      return this.orderFeedback('NIE DOJDĘ TAM');
+    }
+    this.clearOrders();
+    p.path = path;
+    if (path.length) {
+      p.order = { kind: 'move', x: tx, y: ty };
+      this.pathGoal = { x: tx, y: ty };
+      this.audio.play('click');
+    }
+    return { kind: 'move', x: tx, y: ty };
+  }
+
+  // Opis interakcji dokładnie na wskazanym kaflu (bez sąsiadów).
+  interactionAt(x, y) {
+    const w = this.world;
+    if (!w || !w.inBounds(x, y)) return null;
+    const t = w.tile(x, y);
+    if (!t) return null;
+    // Otwarte drzwi są przechodnie — kliknięcie oznacza „idź”, nie „zamknij”.
+    if (t.wall && t.wall.feature === 'door' && !t.wall.destroyed && !t.wall.open) {
+      return {
+        kind: 'door',
+        wall: t.wall,
+        x,
+        y,
+        short: 'OTWÓRZ DRZWI',
+        text: 'E OTWÓRZ DRZWI',
+      };
+    }
+    if (t.prop && t.prop.container) {
+      const name = CONTAINER_NAMES[t.prop.container.type] || t.prop.name;
+      const searched = !!t.prop.container.searched;
+      return {
+        kind: 'container',
+        prop: t.prop,
+        x,
+        y,
+        searched,
+        short: searched ? `${name}: PRZESZUKANE` : `PRZESZUKAJ ${name}`,
+        text: searched ? `${name}: PRZESZUKANE` : `E PRZESZUKAJ ${name}`,
+      };
+    }
+    // Nie zabite okno można po prostu przekroczyć (klik = idź). Interakcja
+    // dotyczy tylko okien częściowo zabitych deskami.
+    if (
+      t.wall &&
+      (t.wall.feature === 'window' || t.wall.feature === 'windowBroken') &&
+      t.wall.barricade > 0 &&
+      t.wall.barricade < 3
+    ) {
+      return {
+        kind: 'window',
+        wall: t.wall,
+        x,
+        y,
+        short: 'DOBUDUJ DESKI',
+        text: `E DOBUDUJ DESKI (${t.wall.barricade}/3)`,
+      };
+    }
+    if (t.prop && t.prop.sleep) {
+      return { kind: 'bed', prop: t.prop, x, y, short: 'ŚPIJ W ŁÓŻKU', text: 'E ŚPIJ W ŁÓŻKU' };
+    }
+    const rec = w.itemAt(x, y);
+    if (rec) {
+      const label = this.itemLabel(rec.item);
+      return {
+        kind: 'item',
+        rec,
+        x,
+        y,
+        short: `WEŹ ${label}`,
+        text: `E PODNIEŚ ${label}`,
+      };
+    }
+    return null;
+  }
+
+  // A* po siatce 8 kierunków. Diagonale nie mogą ścinać narożników.
+  findPath(tx, ty, opts = {}) {
+    const w = this.world;
+    const p = this.player;
+    if (!w || !p || !w.inBounds(tx, ty)) return null;
+    let goals;
+    if (opts.adjacent) {
+      goals = [];
+      for (const [dx, dy] of NEIGH8) {
+        const x = tx + dx;
+        const y = ty + dy;
+        if (!w.inBounds(x, y) || !this.pathPassable(x, y)) continue;
+        goals.push({ x, y });
+      }
+      if (!goals.length) return null;
+    } else {
+      if (!this.pathPassable(tx, ty)) return null;
+      goals = [{ x: tx, y: ty }];
+    }
+
+    const avoidZombies = opts.ignoreZombies ? false : true;
+    const startX = p.x;
+    const startY = p.y;
+    const startKey = startY * WORLD_W + startX;
+    const goalSet = new Set(goals.map((g) => g.y * WORLD_W + g.x));
+    if (goalSet.has(startKey)) return [];
+
+    const heuristic = (x, y) => {
+      let best = Infinity;
+      for (const g of goals) {
+        const dx = Math.abs(g.x - x);
+        const dy = Math.abs(g.y - y);
+        best = Math.min(best, Math.max(dx, dy) + 0.414 * Math.min(dx, dy));
+      }
+      return best;
+    };
+
+    const gScore = new Map([[startKey, 0]]);
+    const came = new Map();
+    const open = new PathHeap();
+    open.push(startX, startY, heuristic(startX, startY));
+    let found = null;
+    let expanded = 0;
+
+    while (open.size && expanded < PATH_BUDGET) {
+      const cur = open.pop();
+      expanded++;
+      const ck = cur.y * WORLD_W + cur.x;
+      const gCur = gScore.get(ck);
+      if (gCur == null) continue;
+      if (cur.f > gCur + heuristic(cur.x, cur.y) + 1e-6) continue; // nieaktualny wpis
+      if (goalSet.has(ck)) {
+        found = { x: cur.x, y: cur.y };
+        break;
+      }
+      for (const [dx, dy] of NEIGH8) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        if (!w.inBounds(nx, ny)) continue;
+        if (dx && dy) {
+          // bez cięcia narożników: oba kafle po bokach muszą być przechodnie
+          if (!this.pathPassable(cur.x + dx, cur.y) || !this.pathPassable(cur.x, cur.y + dy)) continue;
+        }
+        if (!this.pathPassable(nx, ny)) continue;
+        if (avoidZombies && !(nx === startX && ny === startY) && this.zombiesAt(nx, ny)) continue;
+        const nk = ny * WORLD_W + nx;
+        const step = (dx && dy ? 1.414 : 1) * (w.moveCost(nx, ny) || 1);
+        const tentative = gCur + step;
+        const known = gScore.get(nk);
+        if (known != null && tentative >= known) continue;
+        gScore.set(nk, tentative);
+        came.set(nk, ck);
+        open.push(nx, ny, tentative + heuristic(nx, ny));
+      }
+    }
+    if (!found) return null;
+
+    const path = [];
+    let k = found.y * WORLD_W + found.x;
+    while (k !== startKey) {
+      path.push({ x: k % WORLD_W, y: Math.floor(k / WORLD_W) });
+      k = came.get(k);
+      if (k == null || path.length > PATH_MAX) return null;
+    }
+    path.reverse();
+    return path;
+  }
+
+  // Zamknięte drzwi są przechodnie dla planowania — gracz otworzy je po drodze.
+  pathPassable(x, y) {
+    if (this.world.isWalkable(x, y)) return true;
+    const t = this.world.tile(x, y);
+    return !!(t && t.wall && t.wall.feature === 'door' && !t.wall.open && !t.wall.destroyed);
+  }
+
+  stepAlongPath() {
+    const p = this.player;
+    if (!p || !p.path || !p.path.length) return false;
+    const n = p.path[0];
+    if (!this.world.inBounds(n.x, n.y)) {
+      this.clearOrders();
+      return false;
+    }
+    if (!this.world.isWalkable(n.x, n.y)) {
+      const t = this.world.tile(n.x, n.y);
+      if (t && t.wall && t.wall.feature === 'door' && !t.wall.open && !t.wall.destroyed) {
+        // po drodze otwórz drzwi; krok nastąpi w kolejnej klatce
+        this.world.toggleDoor(n.x, n.y);
+        this.audio.play('door');
+        this.updateFOV(true);
+        this.emitNoise(n.x, n.y, 2);
+        return true;
+      }
+      this.clearOrders();
+      this.bump();
+      return false;
+    }
+    if (this.zombiesAt(n.x, n.y)) {
+      // ktoś stoi na drodze — zatrzymaj się, nie przepychaj
+      this.clearOrders();
+      this.bump();
+      return true;
+    }
+    p.path.shift();
+    this.startStep(n.x, n.y);
+    return true;
+  }
+
+  arriveOrder() {
+    const p = this.player;
+    if (!p || !p.order || p.moving || p.path.length) return;
+    const order = p.order;
+    p.order = null;
+    this.pathGoal = null;
+    if (order.kind === 'interact') {
+      if (Math.max(Math.abs(order.x - p.x), Math.abs(order.y - p.y)) > 1) return;
+      const it = this.interactionAt(order.x, order.y);
+      if (it) this.performInteraction(it);
+    } else if (order.kind === 'face') {
+      const z = this.world.zombies.find((zz) => zz.alive && zz.x === order.x && zz.y === order.y);
+      if (z) {
+        p.dir = this.facingFromDelta(order.x - p.x, order.y - p.y);
+        this.facing = p.dir;
+      }
+    }
+  }
+
+  updateHover() {
+    if (this.mode !== 'playing' || !this.mouse.active || !this.world || !this.camera) {
+      this.hover = null;
+      return;
+    }
+    const sx = this.mouse.x;
+    const sy = this.mouse.y;
+    const w = this.screen ? this.screen.w : VIEW_W;
+    const h = this.screen ? this.screen.h : VIEW_H;
+    if (sx < 0 || sy < 0 || sx >= w || sy >= h || this.isOverHud(sx, sy)) {
+      this.hover = null;
+      return;
+    }
+    const [x, y] = this.camera.tileAtScreen(sx, sy);
+    if (!this.world.inBounds(x, y)) {
+      this.hover = { sx, sy, x, y, state: 'none', label: '' };
+      return;
+    }
+    if (this.world.zombies.some((z) => z.alive && z.x === x && z.y === y)) {
+      // zombie za ścianą: widać go, ale atak nie ma linii strzału
+      const los = this.world.lineOfSight(this.player.x, this.player.y, x, y);
+      this.hover = los
+        ? { sx, sy, x, y, state: 'attack', label: 'ZOMBIE' }
+        : { sx, sy, x, y, state: 'noLOS', label: 'BRAK WIDOCZNOŚCI' };
+      return;
+    }
+    const it = this.interactionAt(x, y);
+    if (it) {
+      this.hover = { sx, sy, x, y, state: 'interact', label: it.short };
+      return;
+    }
+    const walkable = this.world.isWalkable(x, y);
+    this.hover = {
+      sx,
+      sy,
+      x,
+      y,
+      state: walkable ? 'move' : 'blocked',
+      label: walkable ? '' : 'BLOKADA',
+    };
+  }
+
+  // Trzymany LPM: lider podąża za kursorem (CF). Przeliczamy rzadko, żeby
+  // kamera push-scroll nie wywoływała lawiny przeliczeń.
+  updateMouseHold(dt) {
+    if (!this.mouseLeftHeld || this.mode !== 'playing' || !this.player) return;
+    // klawiatura/pad mają pierwszeństwo — nie mieszajmy dwóch źródeł ruchu
+    if (this.padVector || this.moveStack.length) return;
+    this._holdT = (this._holdT || 0) + dt;
+    if (this._holdT < HOLD_REPATH) return;
+    this._holdT = 0;
+    if (!this.mouse.active) return;
+    const x = this.mouse.x;
+    const y = this.mouse.y;
+    if (this.isOverHud(x, y)) return;
+    const h = this.hover;
+    if (!h || h.state !== 'move') return;
+    const sameSpot = this._lastHoldX === x && this._lastHoldY === y;
+    const headingToSpot = this.pathGoal && this.pathGoal.x === h.x && this.pathGoal.y === h.y;
+    if (sameSpot && (this.player.path.length || headingToSpot || this.player.moving)) return;
+    this._lastHoldX = x;
+    this._lastHoldY = y;
+    this.issueMoveOrder(x, y);
+  }
+
+  // Push-scroll: martwa strefa wokół środka, potem kamera wyprzedza kursor.
+  updateCameraLead(dt) {
+    let tx = 0;
+    let ty = 0;
+    const m = this.mouse;
+    if (m.active && this.mode === 'playing' && !this.isOverHud(m.x, m.y)) {
+      const cw = (this.screen ? this.screen.w : VIEW_W) / 2;
+      const ch = (this.screen ? this.screen.h : VIEW_H) / 2;
+      const dx = m.x - cw;
+      const dy = m.y - ch;
+      if (Math.abs(dx) > MOUSE_DEADZONE_X) {
+        tx = (dx - Math.sign(dx) * MOUSE_DEADZONE_X) * 0.55;
+        tx = Math.max(-MOUSE_LEAD_MAX_X, Math.min(MOUSE_LEAD_MAX_X, tx));
+      }
+      if (Math.abs(dy) > MOUSE_DEADZONE_Y) {
+        ty = (dy - Math.sign(dy) * MOUSE_DEADZONE_Y) * 0.55;
+        ty = Math.max(-MOUSE_LEAD_MAX_Y, Math.min(MOUSE_LEAD_MAX_Y, ty));
+      }
+    }
+    const k = Math.min(1, dt * 7);
+    this.leadX += (tx - this.leadX) * k;
+    this.leadY += (ty - this.leadY) * k;
+    if (this.camera) {
+      this.camera.lookX = this.leadX;
+      this.camera.lookY = this.leadY;
+    }
+  }
+
   // Prezentacja klatki: w RTG liczymy prawdziwe światło RGB, w OCS/AGA
   // wystarczy podmiana indeksów na paletę.
   present() {
@@ -1938,6 +2560,7 @@ export class Game {
 
   render() {
     this.buttons = [];
+    if (this.screen && this.screen.clearUiMask) this.screen.clearUiMask();
     if (this.mode === 'menu' || this.mode === 'about' || (this.mode === 'help' && this.helpBg === 'menu')) {
       this.renderMenuScene();
       if (this.mode === 'menu') drawTitle(this);
@@ -1950,6 +2573,7 @@ export class Game {
       this.renderGameScene();
       if (this.mode === 'playing') {
         drawHUD(this);
+        drawCursor(this);
       } else if (this.mode === 'paused') {
         drawHUD(this);
         drawPause(this);
@@ -1983,6 +2607,7 @@ export class Game {
   renderGameScene() {
     this.camera.follow(this.player.vx, this.player.vy);
     renderWorld(this, this.world, this.camera, {});
+    renderOrders(this);
     renderEffects(this);
     if (this.weather === 'rain' && !this.playerInside()) drawRain(this);
   }

@@ -705,6 +705,274 @@ section('Tryby graficzne OCS / AGA / RTG');
   check('RTG prezentuje oświetlony bufor', lit !== plain, `${lit} vs ${plain}`);
 }
 
+section('Mysz: klik-idź, kursor, kamera');
+{
+  const g = newGame(1337);
+  g.world.zombies.length = 0;
+  const p = g.player;
+  const at = (x, y) => {
+    const [sx, sy] = g.camera.toScreen(x, y);
+    return [sx + 16, sy + 8];
+  };
+  // czysty, przechodni kafel 2–6 kroków od gracza
+  let target = null;
+  for (let y = 0; y < 40 && !target; y++) {
+    for (let x = 0; x < 48; x++) {
+      if (!g.world.isWalkable(x, y) || g.interactionAt(x, y)) continue;
+      const path = g.findPath(x, y, {});
+      if (path && path.length >= 2 && path.length <= 6) {
+        target = { x, y, path };
+        break;
+      }
+    }
+  }
+  check('jest czysty cel dla klik-idź', !!target);
+  const [tx, ty] = at(target.x, target.y);
+  const order = g.issueMoveOrder(tx, ty);
+  check('LPM na ziemi wydaje rozkaz idź', !!order && order.kind === 'move');
+  check('trasa kończy się w klikniętym kaflu', p.path.length > 0 && p.path[p.path.length - 1].x === target.x && p.path[p.path.length - 1].y === target.y);
+  check('trasa omija kafle nieprzechodnie', p.path.every((t) => g.world.isWalkable(t.x, t.y)));
+  let cornerCut = false;
+  for (let i = 0; i < p.path.length; i++) {
+    const a = i ? p.path[i - 1] : { x: p.x, y: p.y };
+    const b = p.path[i];
+    if (a.x !== b.x && a.y !== b.y) {
+      if (!g.world.isWalkable(b.x, a.y) || !g.world.isWalkable(a.x, b.y)) cornerCut = true;
+    }
+  }
+  check('trasa nie ścina narożników', !cornerCut);
+  for (let i = 0; i < 600 && (p.path.length || p.moving); i++) g.update(1 / 60);
+  check('gracz doszedł do klikniętego kafla', p.x === target.x && p.y === target.y, `${p.x},${p.y}`);
+  check('klik-idź nie atakuje automatycznie', p.attackCd === 0);
+
+  // HUD nie wydaje rozkazów, ale sloty nadal działają
+  const px = p.x;
+  const py = p.y;
+  g.pointerDown(20, 10, 0);
+  g.pointerUp(20, 10, 0);
+  check('klik w panel HUD nie rusza gracza', p.x === px && p.y === py && p.path.length === 0 && !p.order);
+  g.selected = 0;
+  g.pointerDown(30, 173, 0);
+  g.pointerUp(30, 173, 0);
+  check('klik w slot wybiera przedmiot', g.selected === 1, `selected=${g.selected}`);
+
+  // stara lista przycisków (np. z pauzy) nie może działać w trybie gry
+  const staleProfile = g.profileId;
+  g.buttons = [{ x: 0, y: 0, w: 320, h: 200, action: 'graphics' }];
+  g.click(160, 100);
+  check('stare przyciski menu nie działają w grze', g.profileId === staleProfile, `profil=${g.profileId}`);
+  g.buttons = [];
+
+  // solidna ściana: brak trasy i brak ataku
+  let wall = null;
+  for (let y = 0; y < 40 && !wall; y++) {
+    for (let x = 0; x < 48; x++) {
+      const t = g.world.tile(x, y);
+      if (!t.wall || t.wall.feature || t.wall.destroyed) continue;
+      const [sx, sy] = g.camera.toScreen(x, y);
+      if (sy > 44 && sy < 130 && sx > 10 && sx < 300) {
+        wall = { x, y, sx, sy };
+        break;
+      }
+    }
+  }
+  check('jest solidna ściana w kadrze', !!wall);
+  g.clearOrders();
+  p.attackCd = 0;
+  g.click(wall.sx + 16, wall.sy + 8);
+  check('klik w ścianę nie tworzy trasy', p.path.length === 0 && !p.order);
+  check('klik w ścianę nie atakuje', p.attackCd === 0);
+}
+
+{
+  const g = newGame(1337);
+  g.world.zombies.length = 0;
+  const p = g.player;
+  g.pointerMove(160, 100);
+  g.update(1 / 60);
+  check('kursor nad podłogą = stan idź', !!g.hover && g.hover.state === 'move', g.hover && g.hover.state);
+
+  // zombie obok: podświetlenie i atak PPM
+  let spot = null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 2], [2, 0], [-2, 0], [0, -2], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+    const x = p.x + dx;
+    const y = p.y + dy;
+    if (!g.world.isWalkable(x, y) || g.zombiesAt(x, y)) continue;
+    const [px2, py2] = g.camera.toScreen(x, y);
+    if (g.isOverHud(px2 + 16, py2 + 8)) continue;
+    spot = { x, y };
+    break;
+  }
+  check('jest miejsce na zombie testowe', !!spot);
+  const z = g.world.addZombie(spot.x, spot.y);
+  z.stun = 999;
+  const [sx, sy] = g.camera.toScreen(spot.x, spot.y);
+  g.pointerMove(sx + 16, sy + 8);
+  g.update(1 / 60);
+  check('kursor nad zombie = cel ataku', !!g.hover && g.hover.state === 'attack');
+  p.attackCd = 0;
+  const hpBefore = z.hp;
+  g.rightClick(sx + 16, sy + 8);
+  check('PPM atakuje w stronę kursora', p.attackCd > 0);
+  check('atak PPM trafia zombie', z.hp < hpBefore || !z.alive, `hp ${hpBefore}->${z.hp}`);
+
+  // PPM w pusty kafel nie może „przykleić się” do zombie poza kursorem
+  p.attackCd = 0;
+  const hpAfterFirst = z.hp;
+  const [ex, ey] = g.camera.toScreen(Math.min(47, p.x + 4), p.y);
+  g.rightClick(ex + 16, ey + 8);
+  check('PPM bez celu nie rani zombie poza kursorem', z.hp === hpAfterFirst, `hp ${hpAfterFirst}->${z.hp}`);
+
+  // zombie za solidną ścianą: podświetlenie bez linii wzroku
+  let hidden = null;
+  for (let y = 0; y < 40 && !hidden; y++) {
+    for (let x = 0; x < 48; x++) {
+      if (!g.world.isWalkable(x, y) || g.world.lineOfSight(p.x, p.y, x, y)) continue;
+      const [hx, hy] = g.camera.toScreen(x, y);
+      if (hx + 16 < 8 || hx + 16 > 312 || hy + 8 < 50 || hy + 8 > 150) continue;
+      if (g.isOverHud(hx + 16, hy + 8)) continue;
+      hidden = { x, y, sx: hx + 16, sy: hy + 8 };
+      break;
+    }
+  }
+  check('jest kafel za ścianą do testu LOS', !!hidden);
+  if (hidden) {
+    const z2 = g.world.addZombie(hidden.x, hidden.y);
+    z2.stun = 999;
+    g.pointerMove(hidden.sx, hidden.sy);
+    g.update(1 / 60);
+    check('zombie za ścianą = brak widoczności', !!g.hover && g.hover.state === 'noLOS', g.hover && g.hover.state);
+  }
+
+  g.pointerMove(10, 10);
+  g.update(1 / 60);
+  check('kursor w HUD nie podświetla kafla', g.hover === null);
+
+  g.pointerMove(318, 100);
+  g.updateCameraLead(0.5);
+  check('kamera wyprzedza kursor (push-scroll)', g.camera.lookX > 10, `lookX=${g.camera.lookX}`);
+  g.pointerMove(160, 100);
+  g.updateCameraLead(0.5);
+  check('kamera wraca do martwej strefy', Math.abs(g.camera.lookX) < 1, `lookX=${g.camera.lookX}`);
+
+  // RTG nocą: kursor i ścieżka to warstwa UI, więc nie gasną razem ze światłem
+  g.setProfile('rtg', true);
+  g.time = 23 * 60;
+  g.player.flashlightOn = false;
+  g.pointerMove(30, 120);
+  g.updateHover();
+  g.render();
+  g.present();
+  const lum = (v) => (v & 255) + ((v >> 8) & 255) + ((v >> 16) & 255);
+  const cursorLum = lum(g.screen.u32[120 * 320 + 30]);
+  const backdropLum = lum(g.screen.u32[120 * 320 + 40]);
+  check('kursor świeci pełną jasnością nocą (RTG)', cursorLum > backdropLum + 120, `kursor=${cursorLum} tło=${backdropLum}`);
+}
+
+{
+  // LPM na zombie: podejdź, ale nie atakuj
+  const g = newGame(1337);
+  g.world.zombies.length = 0;
+  const p = g.player;
+  let target = null;
+  for (let y = 0; y < 40 && !target; y++) {
+    for (let x = 0; x < 48; x++) {
+      if (x === p.x && y === p.y) continue;
+      if (!g.world.isWalkable(x, y) || g.interactionAt(x, y)) continue;
+      const path = g.findPath(x, y, { adjacent: true });
+      if (path && path.length >= 2 && path.length <= 5) {
+        target = { x, y };
+        break;
+      }
+    }
+  }
+  check('jest cel podejścia do zombie', !!target);
+  const z = g.world.addZombie(target.x, target.y);
+  z.stun = 999;
+  const [sx, sy] = g.camera.toScreen(target.x, target.y);
+  const order = g.issueMoveOrder(sx + 16, sy + 8);
+  check('LPM na zombie = rozkaz podejdź', !!order && order.kind === 'face');
+  for (let i = 0; i < 300 && (p.path.length || p.moving); i++) g.update(1 / 60);
+  const near = Math.max(Math.abs(p.x - target.x), Math.abs(p.y - target.y)) === 1;
+  check('gracz zatrzymuje się obok zombie', near, `${p.x},${p.y} vs ${target.x},${target.y}`);
+  check('podejście nie atakuje automatycznie', p.attackCd === 0 && p.hp === 100);
+}
+
+{
+  // klik w zamknięte drzwi: dojdź i otwórz
+  const g = newGame(1337);
+  g.world.zombies.length = 0;
+  const p = g.player;
+  let door = null;
+  for (let y = 0; y < 40 && !door; y++) {
+    for (let x = 0; x < 48; x++) {
+      const t = g.world.tile(x, y);
+      if (!t.wall || t.wall.feature !== 'door' || t.wall.open) continue;
+      const path = g.findPath(x, y, { adjacent: true });
+      if (path && path.length <= 4) {
+        door = { x, y };
+        break;
+      }
+    }
+  }
+  check('jest bliskie zamknięte drzwi', !!door);
+  const [dx, dy] = g.camera.toScreen(door.x, door.y);
+  const order = g.issueMoveOrder(dx + 16, dy + 8);
+  check('LPM na drzwi = interakcja', !!order && order.kind === 'interact');
+  for (let i = 0; i < 300 && (p.path.length || p.moving); i++) g.update(1 / 60);
+  g.update(1 / 60);
+  check('gracz otworzył drzwi po dojściu', g.world.tile(door.x, door.y).wall.open);
+}
+
+{
+  // klik w pojemnik: dojdź i przeszukaj
+  const g = newGame(1337);
+  g.world.zombies.length = 0;
+  const fridge = g.world.tile(16, 3);
+  check('obok startu stoi pojemnik', !!(fridge.prop && fridge.prop.container));
+  const [fx, fy] = g.camera.toScreen(16, 3);
+  const order = g.issueMoveOrder(fx + 16, fy + 8);
+  check('LPM na pojemnik = interakcja', !!order && order.kind === 'interact');
+  for (let i = 0; i < 200; i++) g.update(1 / 60);
+  check('pojemnik przeszukany po dojściu', fridge.prop.container.searched);
+}
+
+{
+  // przytrzymanie LPM i anulowanie nowym kliknięciem
+  const g = newGame(1337);
+  g.world.zombies.length = 0;
+  const p = g.player;
+  const at = (x, y) => {
+    const [sx, sy] = g.camera.toScreen(x, y);
+    return [sx + 16, sy + 8];
+  };
+  let a = null;
+  let b = null;
+  for (let y = 0; y < 40 && (!a || !b); y++) {
+    for (let x = 0; x < 48; x++) {
+      if (!g.world.isWalkable(x, y) || g.interactionAt(x, y)) continue;
+      const path = g.findPath(x, y, {});
+      if (!path || path.length < 2 || path.length > 6) continue;
+      const [cx2, cy2] = at(x, y);
+      if (g.isOverHud(cx2, cy2) || cx2 < 6 || cx2 > 314 || cy2 < 50 || cy2 > 150) continue;
+      if (!a) a = { x, y };
+      else if (Math.abs(x - a.x) + Math.abs(y - a.y) > 3) b = { x, y };
+      if (a && b) break;
+    }
+  }
+  check('są dwa cele do testu anulowania', !!a && !!b);
+  const [ax, ay] = at(a.x, a.y);
+  g.pointerDown(ax, ay, 0);
+  check('LPM ustawia przytrzymanie', g.mouseLeftHeld === true);
+  check('przytrzymanie od razu wydaje rozkaz', p.path.length > 0 || p.moving);
+  g.pointerUp(ax, ay, 0);
+  check('puszczenie LPM kończy przytrzymanie', g.mouseLeftHeld === false);
+  const [bx, by] = at(b.x, b.y);
+  g.click(bx, by);
+  check('nowy klik anuluje stary rozkaz', !!p.order && p.order.x === b.x && p.order.y === b.y);
+  check('nowa trasa prowadzi do nowego celu', p.path.length > 0 && p.path[p.path.length - 1].x === b.x && p.path[p.path.length - 1].y === b.y);
+}
+
 section('Dane i eksport');
 {
   const g = newGame();

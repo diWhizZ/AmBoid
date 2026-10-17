@@ -47,7 +47,7 @@ z domyślnymi opcjami wystarczy).
 
 ### Wariant B — ZIP (bez Gita)
 
-Pobierasz **gałąź roboczą** z wersją 0.2.2 (po scaleniu PR #1 to samo będzie
+Pobierasz **gałąź roboczą** z wersją 0.2.3 (po scaleniu PR #1 to samo będzie
 w `main`).
 
 1. Otwórz **https://github.com/diWhizZ/AmBoid/tree/arena/cb222f77-amboid**.
@@ -73,21 +73,23 @@ Powinny być m.in. `index.html`, `package.json`, `src`, `tools`, `docs`.
 
 ### Masz starszy ZIP? Aktualizacja bez Gita
 
-Wersję 0.2.2 poznasz po pliku `src\gamepad.js` i pozycji **`STEROWANIE: EKRAN`**
-w menu głównym oraz po klawiszu **K**. Jeśli ich nie ma — masz stary build.
+Wersję 0.2.3 poznasz po **sterowaniu myszą** (kursor i trasa kropkami) oraz
+po oznaczeniu **`V0.2.3`** w prawym dolnym rogu ekranu tytułowego. W menu nadal jest
+`STEROWANIE: EKRAN/IZO`, a klawisz **K** przełącza schemat ruchu.
+Jeśli mysz nie działa — masz stary build.
 
 Najszybciej, bez Gita i bez klikania:
 
 ```powershell
-$zip = "$env:USERPROFILE\Downloads\AmBoid-022.zip"
+$zip = "$env:USERPROFILE\Downloads\AmBoid-023.zip"
 Invoke-WebRequest "https://github.com/diWhizZ/AmBoid/archive/refs/heads/arena/cb222f77-amboid.zip" -OutFile $zip
-Expand-Archive $zip -DestinationPath "D:\Gry\AmBoid-022" -Force
-cd "D:\Gry\AmBoid-022\AmBoid-arena-cb222f77-amboid"
+Expand-Archive $zip -DestinationPath "D:\Gry\AmBoid-023" -Force
+cd "D:\Gry\AmBoid-023\AmBoid-arena-cb222f77-amboid"
 node tools\serve.mjs
 ```
 
 Potem otwórz `http://localhost:8080` i sprawdź w konsoli (F12) komunikat
-`AMBOID v0.2.2…`. Jeśli `Expand-Archive` zgłosi błąd ścieżki, usuń `-Force`
+`AMBOID v0.2.3…`. Jeśli `Expand-Archive` zgłosi błąd ścieżki, usuń `-Force`
 i rozpakuj do nieistniejącego jeszcze folderu.
 
 ---
@@ -168,8 +170,16 @@ http://localhost:8080/?gfx=rtg&seed=ABC123
   domyślnego, dopisz `?gfx=aga` albo wyczyść dane witryny.
 
 **Sterowanie:** `WASD`/strzałki — ruch, `Shift` — bieg, `Ctrl` — skradanie,
-`Spacja`/LPM — atak, `E` — akcja, `Q` — użyj, `1–0` — sloty, `F` — latarka,
-`M` — mapa, `H` — pomoc, `Esc` — pauza, `G` — tryb grafiki.
+`Spacja`/`PPM` — atak, `E` — akcja, `Q` — użyj, `1–0` — sloty, `F` — latarka,
+`M` — mapa, `H` — pomoc, `Esc` — pauza, `G` — tryb graficzny.
+
+**Mysz:** `LPM` na ziemi — idź do kursora (przytrzymanie = podążanie),
+`LPM` na drzwiach/pojemniku/łóżku/łupie — podejdź i wykonaj akcję,
+`LPM` na zombie — podejdź bez automatycznego ataku, `PPM` — atak w stronę
+kursora. Nowe kliknięcie anuluje poprzedni rozkaz; kursor ma białe ramiona i
+kolorowy środek (biały — idź, złoty — interakcja, żółty — zombie, czerwony —
+blokada, szary — brak linii wzroku). W RTG kursor świeci pełną jasnością także
+nocą (warstwa UI).
 
 **Schemat ruchu (klawisz `K`).** Jeśli `A`/`D` wydają się „nie w tę stronę”,
 naciśnij **K** — przełączysz ruch z trybu **EKRAN** (W góra, S dół, A lewo,
@@ -268,7 +278,7 @@ punkt 1 lub 3 zadziała zawsze.
 | Pusta/biała strona | otwarto `file://` zamiast `http://localhost:8080`; odśwież Ctrl+F5 |
 | `EADDRINUSE` / port zajęty | zmień port: `$env:PORT=8081; npm start` |
 | Brak dźwięku | kliknij najpierw w planszę gry |
-| `G` nie zmienia grafiki | stary ZIP bez `src\profiles.js` — pobierz wersję 0.2.2 (sekcja 2) |
+| `G` nie zmienia grafiki | stary ZIP bez `src\profiles.js` — pobierz wersję 0.2.3 (sekcja 2) |
 | `A`/`D` idą „nie w tę stronę” | naciśnij **K** i wybierz schemat IZO; to różnica interpretacji izometrii, nie błąd klawisza |
 | Pad nie reaguje | kliknij planszę (przeglądarki blokują wejście do momentu interakcji), sprawdź tryb XInput i odśwież stronę z podłączonym padem |
 | Gra pamięta tryb RTG i wygląda ciemno | to noc w RTG — wciśnij **G**, aby wrócić do AGA, albo zagraj do rana |

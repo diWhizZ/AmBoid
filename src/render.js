@@ -29,6 +29,9 @@ export class Screen {
     this.h = h;
     this.data = new Uint8Array(w * h);
     this.u32 = new Uint32Array(w * h);
+    // Piksele interfejsu (kursor) nie są przygaszane przez światło w RTG.
+    this.uiMask = new Uint8Array(w * h);
+    this.uiLayer = false;
     this.profileId = 'ocs';
     this.setProfile({
       id: 'ocs',
@@ -65,13 +68,21 @@ export class Screen {
 
   clear(color = C.VOID) {
     this.data.fill(color);
+    this.uiMask.fill(0);
+  }
+
+  clearUiMask() {
+    this.uiMask.fill(0);
   }
 
   set(x, y, c) {
     x |= 0;
     y |= 0;
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
-    this.data[y * this.w + x] = c;
+    const i = y * this.w + x;
+    this.data[i] = c;
+    // każdy późniejszy rysunek świata zdejmuje oznaczenie UI z tego piksela
+    this.uiMask[i] = this.uiLayer ? 1 : 0;
   }
 
   get(x, y) {
@@ -181,6 +192,7 @@ export class Screen {
         if (dither > 0 && BAYER[(py & 3) * 4 + (px & 3)] < dither) c = C.OUTLINE;
         if (flash != null) c = flash;
         this.data[row + px] = c;
+        this.uiMask[row + px] = this.uiLayer ? 1 : 0;
       }
     }
   }
@@ -235,6 +247,11 @@ export class Screen {
       const dy2base = y * 2;
       for (let x = 0; x < w; x++) {
         const idx = d[y * w + x];
+        // kursor/HUD rysowane jako warstwa UI: pełna jasność, bez tintu nocy
+        if (this.uiMask[y * w + x]) {
+          u[y * w + x] = this.pal256[idx];
+          continue;
+        }
         const bi = idx * 3;
         let r = p[bi] * ambient;
         let g = p[bi + 1] * ambient;
@@ -290,6 +307,9 @@ export class Camera {
     this.offY = 0;
     this.viewW = VIEW_W;
     this.viewH = VIEW_H;
+    // Wyprzedzenie kamery za kursorem (CF) — w pikselach ekranu.
+    this.lookX = 0;
+    this.lookY = 0;
   }
 
   follow(x, y) {
@@ -297,8 +317,8 @@ export class Camera {
     this.y = y;
     const cx = isoX(x, y) + TILE_W / 2;
     const cy = isoY(x, y) + TILE_H / 2;
-    this.offX = Math.round(this.viewW / 2 - cx);
-    this.offY = Math.round(this.viewH / 2 - cy);
+    this.offX = Math.round(this.viewW / 2 - cx) + Math.round(this.lookX || 0);
+    this.offY = Math.round(this.viewH / 2 - cy) + Math.round(this.lookY || 0);
   }
 
   toScreen(x, y) {

@@ -77,6 +77,58 @@ for (const z of game.world.zombies) z.flash = 0; // bez białej klatki trafienia
 game.render();
 save('03-walka.png');
 
+// 3b. Mysz: kursor, podgląd trasy i etykieta interakcji
+game.setProfile('aga', true);
+game.time = 10 * 60 + 20;
+game.mode = 'playing';
+for (const z of game.world.zombies) z.stun = 99;
+const player = game.player;
+game.camera.follow(player.vx, player.vy);
+let mouseTarget = null;
+// najpierw spróbuj drzwi: trasa + złota etykieta akcji
+for (let y = 0; y < 40 && !mouseTarget; y++) {
+  for (let x = 0; x < 48; x++) {
+    const t = game.world.tile(x, y);
+    if (!t.wall || t.wall.feature !== 'door' || t.wall.open) continue;
+    const path = game.findPath(x, y, { adjacent: true });
+    if (!path || path.length < 2 || path.length > 7) continue;
+    const [sx, sy] = game.camera.toScreen(x, y);
+    if (sx < 20 || sx > 280 || sy < 50 || sy > 135) continue;
+    mouseTarget = { x, y, int: true };
+    break;
+  }
+}
+if (!mouseTarget) {
+  for (let y = 0; y < 40 && !mouseTarget; y++) {
+    for (let x = 0; x < 48; x++) {
+      if (!game.world.isWalkable(x, y) || game.interactionAt(x, y)) continue;
+      const path = game.findPath(x, y, {});
+      if (!path || path.length < 3 || path.length > 7) continue;
+      const [sx, sy] = game.camera.toScreen(x, y);
+      if (sx < 20 || sx > 280 || sy < 50 || sy > 135) continue;
+      mouseTarget = { x, y, int: false };
+      break;
+    }
+  }
+}
+if (mouseTarget) {
+  const [mx, my] = game.camera.toScreen(mouseTarget.x, mouseTarget.y);
+  game.pointerMove(mx + 16, my + 8);
+  game.updateHover();
+  game.issueMoveOrder(mx + 16, my + 8);
+  game.render();
+  save('10-mysz.png');
+}
+
+// kursor nie powinien trafiać na zrzuty atmosferyczne
+game.releaseMouse();
+game.mouse.active = false;
+game.hover = null;
+game.leadX = 0;
+game.leadY = 0;
+game.camera.lookX = 0;
+game.camera.lookY = 0;
+
 // 4. Noc z latarką — tryb RTG, prawdziwe światło RGB
 game.setProfile('rtg', true);
 game.time = 23 * 60;

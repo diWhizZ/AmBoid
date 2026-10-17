@@ -261,6 +261,89 @@ export function renderWorld(game, world, cam, opts = {}) {
   for (const item of list) item.fn();
 }
 
+// Podgląd rozkazów myszy: ścieżka kropkami, znacznik celu i obrys kafla pod
+// kursorem. Rysowane po świecie, przed HUD-em.
+const ORDER_COLORS = {
+  move: C.WHITE,
+  blocked: C.BLOOD,
+  attack: C.YELLOW,
+  interact: C.GOLD,
+  noLOS: C.STEEL,
+  none: C.SLATE,
+};
+
+function strokeTile(scr, cam, x, y, color, inset = 0) {
+  const [sx, sy] = cam.toScreen(x, y);
+  const cx = sx + TILE_W / 2;
+  const cy = sy + TILE_H / 2;
+  const top = sy + inset;
+  const bottom = sy + TILE_H - inset;
+  const left = sx + inset;
+  const right = sx + TILE_W - inset;
+  scr.line(cx, top, right, cy, color);
+  scr.line(right, cy, cx, bottom, color);
+  scr.line(cx, bottom, left, cy, color);
+  scr.line(left, cy, cx, top, color);
+}
+
+export function renderOrders(game) {
+  if (!game.player || !game.camera || game.mode !== 'playing') return;
+  const scr = game.screen;
+  const cam = game.camera;
+  const p = game.player;
+  // podgląd rozkazów jest warstwą UI — w RTG nie gaśnie w nocy
+  scr.uiLayer = true;
+
+  // 1) ścieżka — kropki co kafel, pierwszy krok jaśniejszy
+  if (p.path && p.path.length) {
+    for (let i = 0; i < p.path.length; i++) {
+      const t = p.path[i];
+      const [sx, sy] = cam.toScreen(t.x, t.y);
+      const cx = sx + TILE_W / 2;
+      const cy = sy + TILE_H / 2;
+      if (cx < -4 || cy < -4 || cx > scr.w + 4 || cy > scr.h + 4) continue;
+      // ciemna podkładka + jasny krzyżyk: czytelne na jasnym asfalcie i trawie
+      scr.rect(cx - 1, cy - 1, 3, 3, C.OUTLINE);
+      scr.rect(cx - 1, cy, 3, 1, C.WHITE);
+      scr.rect(cx, cy - 1, 1, 3, C.WHITE);
+      if (i === 0) scr.set(cx, cy, C.YELLOW);
+    }
+    // znacznik końca trasy — kolor zależny od rodzaju rozkazu
+    const last = p.path[p.path.length - 1];
+    const goalColor = p.order && p.order.kind === 'face' ? C.YELLOW : p.order && p.order.kind === 'interact' ? C.GOLD : C.WHITE;
+    strokeTile(scr, cam, last.x, last.y, C.OUTLINE, 3);
+    strokeTile(scr, cam, last.x, last.y, goalColor, 4);
+    const [gx, gy] = cam.toScreen(last.x, last.y);
+    scr.set(gx + TILE_W / 2, gy + TILE_H / 2, goalColor);
+  }
+
+  // 2) kafel pod kursorem
+  const h = game.hover;
+  if (
+    h &&
+    h.state !== 'none' &&
+    Number.isFinite(h.x) &&
+    Number.isFinite(h.y) &&
+    game.world.inBounds(h.x, h.y) &&
+    h.sx >= 0 &&
+    h.sy >= 0 &&
+    h.sx < scr.w &&
+    h.sy < scr.h
+  ) {
+    const col = ORDER_COLORS[h.state] || C.SLATE;
+    strokeTile(scr, cam, h.x, h.y, C.OUTLINE, 1);
+    strokeTile(scr, cam, h.x, h.y, col, 3);
+    if (h.state === 'blocked' || h.state === 'attack') {
+      const [sx, sy] = cam.toScreen(h.x, h.y);
+      scr.line(sx + 11, sy + 5, sx + 21, sy + 11, C.OUTLINE);
+      scr.line(sx + 11, sy + 11, sx + 21, sy + 5, C.OUTLINE);
+      scr.line(sx + 12, sy + 5, sx + 20, sy + 10, col);
+      scr.line(sx + 12, sy + 10, sx + 20, sy + 5, col);
+    }
+  }
+  scr.uiLayer = false;
+}
+
 export function renderEffects(game) {
   const scr = game.screen;
   const cam = game.camera;

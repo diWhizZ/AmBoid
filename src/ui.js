@@ -105,7 +105,7 @@ export function drawTitle(game) {
   scr.frame(23, 176, 274, 13, C.SLATE_DARK);
   txt(scr, 'STRZAŁKI + ENTER · G GRAFIKA · K SCHEMAT', tx, 179, C.BONE, { align: 'center' });
   scr.rect(287, 190, 30, 8, C.SHADOW);
-  txt(scr, 'V0.2.2', 315, 191, C.SLATE, { align: 'right' });
+  txt(scr, 'V0.2.3', 315, 191, C.SLATE, { align: 'right' });
 }
 
 // Mały portret ocalałego w HUD — twarz zmienia się wraz ze stanem gracza.
@@ -286,6 +286,62 @@ export function drawHUD(game) {
 }
 
 // ---------------------------------------------------------------------------
+// Kursor myszy — rysowany nad HUD-em, w trybie gry. Kolor i etykieta zależą od
+// tego, co jest pod kursorem (idź / blokada / zombie / interakcja).
+export function drawCursor(game) {
+  const scr = game.screen;
+  const m = game.mouse;
+  if (!m || !m.active || game.mode !== 'playing') return;
+  const h = game.hover;
+  const colors = {
+    move: C.WHITE,
+    blocked: C.BLOOD_BRIGHT,
+    attack: C.YELLOW,
+    interact: C.GOLD,
+    noLOS: C.STEEL,
+    none: C.SLATE,
+  };
+  const col = colors[h ? h.state : 'none'] || C.WHITE;
+  const x = Math.round(m.x);
+  const y = Math.round(m.y);
+  // kursor jest warstwą UI — w RTG nie gaśnie wraz ze światłem nocy
+  scr.uiLayer = true;
+
+  // cień, potem właściwy celownik
+  scr.rect(x - 6, y, 4, 1, C.OUTLINE);
+  scr.rect(x + 3, y, 4, 1, C.OUTLINE);
+  scr.rect(x, y - 6, 1, 4, C.OUTLINE);
+  scr.rect(x, y + 3, 1, 4, C.OUTLINE);
+  // ramiona zawsze białe (czytelność na jasnym asfalcie i w nocy),
+  // kolor stanu siedzi w środku i w etykiecie
+  scr.rect(x - 5, y, 3, 1, C.WHITE);
+  scr.rect(x + 3, y, 3, 1, C.WHITE);
+  scr.rect(x, y - 5, 1, 3, C.WHITE);
+  scr.rect(x, y + 3, 1, 3, C.WHITE);
+  scr.rect(x - 1, y - 1, 3, 3, C.OUTLINE);
+  scr.set(x, y, col);
+  scr.set(x - 1, y, col);
+  scr.set(x + 1, y, col);
+  scr.set(x, y - 1, col);
+  scr.set(x, y + 1, col);
+
+  // etykieta celu przy kursorze
+  if (h && h.label) {
+    const text = fit(h.label, 148);
+    const w = textWidth(text) + 7;
+    let lx = x + 9;
+    if (lx + w > scr.w - 2) lx = x - 9 - w;
+    lx = Math.max(2, Math.min(scr.w - w - 2, lx));
+    let ly = y + 8;
+    if (ly + 12 > scr.h - 2) ly = y - 15;
+    ly = Math.max(2, ly);
+    scr.panel(lx, ly, w, 11, { fill: C.SHADOW, border: C.SLATE_DARK, inner: C.OUTLINE });
+    txt(scr, text, lx + 3, ly + 2, col);
+  }
+  scr.uiLayer = false;
+}
+
+// ---------------------------------------------------------------------------
 export function drawPause(game) {
   const scr = game.screen;
   scr.shade(0, 0, scr.w, scr.h, C.OUTLINE, 0);
@@ -311,7 +367,7 @@ export function drawHelp(game) {
     ['RUCH', 'W A S D / STRZAŁKI'],
     ['BIEG', 'SHIFT'],
     ['SKRADANIE', 'CTRL'],
-    ['ATAK', 'SPACJA / LPM'],
+    ['ATAK', 'SPACJA / PPM'],
     ['AKCJA / WEŹ', 'E'],
     ['SCHEMAT', 'K'],
   ];
@@ -333,9 +389,11 @@ export function drawHelp(game) {
     txt(scr, a, 164, y, C.BONE);
     txt(scr, b, 164 + 52, y, C.YELLOW);
   });
-  scr.hline(14, 306, 96, C.SLATE_DARK);
+  scr.hline(14, 306, 92, C.SLATE_DARK);
+  txt(scr, 'MYSZ: LPM IDŹ · PPM ATAK · PRZYTRZYMAJ = PODĄŻAJ', 14, 96, C.YELLOW);
 
-  txt(scr, 'PRZETRWANIE', 14, 98, C.YELLOW);
+  scr.hline(14, 306, 105, C.SLATE_DARK);
+  txt(scr, 'PRZETRWANIE', 14, 108, C.YELLOW);
   const tl = [
     'E OTWIERA DRZWI, MEBLE I PODNOSI ŁUPY.',
     'OKNO ZABIJESZ: MŁOTEK, DESKA, 2 GWOŹDZIE.',
@@ -343,11 +401,11 @@ export function drawHelp(game) {
     'ŚPIJ W ŁÓŻKU, GDY NIE MA ZOMBIE W POBLIŻU.',
     'JEDZ, PIJ, NOŚ BANDAŻE. TABLETKI LECZĄ.',
   ];
-  tl.forEach((line, i) => txt(scr, fit(line, 292), 14, 106 + i * 9, C.BONE));
+  tl.forEach((line, i) => txt(scr, fit(line, 292), 14, 116 + i * 8, C.BONE));
 
-  scr.hline(14, 306, 152, C.SLATE_DARK);
-  txt(scr, 'CEL: PRZETRWAJ DWIE DOBY (DO 08:00 DNIA 3)', 14, 156, C.YELLOW);
-  txt(scr, `ZIARNO: ${game.lastSeedLabel} · TO SAMO ZIARNO = TO SAMO MIASTO`, 14, 166, C.SLATE);
+  scr.hline(14, 306, 156, C.SLATE_DARK);
+  txt(scr, 'CEL: PRZETRWAJ DWIE DOBY (DO 08:00 DNIA 3)', 14, 160, C.YELLOW);
+  txt(scr, `ZIARNO: ${game.lastSeedLabel} · TO SAMO ZIARNO = TO SAMO MIASTO`, 14, 169, C.SLATE);
   button(game, 128, 179, 64, 11, 'POWRÓT', 'back', false);
 }
 

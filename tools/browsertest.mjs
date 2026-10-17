@@ -112,9 +112,50 @@ keydown('Escape');
 frames(2);
 console.log('mode after Esc from help:', window.AMBOID.mode);
 
-// kliknięcie w ekran (atak)
-for (const cb of listeners['canvas:pointerdown'] || []) {
-  cb({ preventDefault() {}, clientX: 20, clientY: 190 });
+// mysz: LPM na ziemi tworzy trasę, HUD nie wydaje rozkazu
+const gm = window.AMBOID;
+gm.mode = 'playing';
+gm.world.zombies.length = 0;
+const pointer = (type, x, y, button = 0) => {
+  const key = type.startsWith('win:') ? type : 'canvas:' + type;
+  for (const cb of listeners[key] || []) {
+    cb({ preventDefault() {}, clientX: x, clientY: y, button, buttons: button === 0 ? 1 : 2, pointerId: 1 });
+  }
+};
+let mouseTarget = null;
+for (let y = 0; y < 40 && !mouseTarget; y++) {
+  for (let x = 0; x < 48; x++) {
+    if (!gm.world.isWalkable(x, y) || gm.interactionAt(x, y)) continue;
+    const path = gm.findPath(x, y, {});
+    if (!path || path.length < 2 || path.length > 5) continue;
+    const [sx, sy] = gm.camera.toScreen(x, y);
+    if (gm.isOverHud(sx + 16, sy + 8)) continue;
+    mouseTarget = { x, y, sx: sx + 16, sy: sy + 8 };
+    break;
+  }
+}
+if (mouseTarget) {
+  pointer('pointerdown', mouseTarget.sx, mouseTarget.sy, 0);
+  console.log('mouse target:', mouseTarget.x, mouseTarget.y, 'path:', gm.player.path.length);
+  if (!gm.mouseLeftHeld || gm.player.path.length === 0) {
+    console.error('BROWSER-STUB FAIL: LPM nie utworzył trasy');
+    process.exitCode = 1;
+  }
+  pointer('win:pointerup', mouseTarget.sx, mouseTarget.sy, 0);
+  if (gm.mouseLeftHeld) {
+    console.error('BROWSER-STUB FAIL: pointerup nie zwolnił LPM');
+    process.exitCode = 1;
+  }
+}
+gm.clearOrders();
+const beforeHudX = gm.player.x;
+const beforeHudY = gm.player.y;
+pointer('pointerdown', 20, 190, 0);
+pointer('win:pointerup', 20, 190, 0);
+console.log('HUD click path:', gm.player.path.length);
+if (gm.player.path.length !== 0 || gm.player.x !== beforeHudX || gm.player.y !== beforeHudY) {
+  console.error('BROWSER-STUB FAIL: klik w HUD ruszył gracza');
+  process.exitCode = 1;
 }
 frames(2);
 

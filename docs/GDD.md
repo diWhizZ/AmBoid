@@ -1,6 +1,6 @@
 # AMBOID — dokument projektowy (GDD)
 
-Wersja 0.2.2 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
+Wersja 0.2.3 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
 
 ---
 
@@ -106,6 +106,13 @@ ruch po osi ekranu. Wybór jest pamiętany w `localStorage['amboid.controls']`.
 (niezależnie od schematu EKRAN/IZO), A na atak, B na akcję, X na użycie,
 Y na latarkę, LB/RB na sloty, LT/RT na skradanie/bieg, Back na mapę,
 Start na pauzę.
+
+**Mysz (0.2.3):** LPM na ziemi wyznacza trasę do kursora (przytrzymanie
+podąża za kursorem), LPM na obiekcie prowadzi do niego i wykonuje akcję,
+LPM na zombie podejmuje podejście bez ataku, PPM atakuje w stronę kursora.
+Kursor ma stany (idź / interakcja / zombie / blokada / brak linii wzroku),
+trasa jest rysowana kropkami, nowe kliknięcie anuluje poprzedni rozkaz, a
+kamera ma martwą strefę i wyprzedzenie za kursorem.
 
 **Doświadczenie:** +2 XP za trafienie, +4 za zabicie; co 12 XP poziom walki
 (+2 obrażeń bazowych). Czasopisma dają +6 XP.
@@ -270,6 +277,14 @@ deski, mapa, ekrany końca, eksport IFF/AMB.
 **v0.2.2** — schematy ruchu EKRAN/IZO (K), obsługa pada (Gamepad API),
 stożek latarki i halo latarni w RTG, portret w HUD, rozbryzgi deszczu,
 komunikaty pod panelem statusu. Plan grafiki: `docs/GRAFIKA.md`.
+
+**v0.2.3 — sterowanie myszą (etap 1 z planu Cannon Fodder → Project Zomboid).**
+LPM na ziemi = idź do kursora (przytrzymanie = podążanie), LPM na obiekcie =
+podejdź i wykonaj jedną akcję, LPM na zombie = podejdź bez automatycznego ataku,
+PPM = atak w stronę kursora. A* po siatce 8 kierunków (bez ścinania narożników,
+auto-otwieranie drzwi po drodze), podgląd trasy kropkami, stany kursora
+(idź / interakcja / zombie / blokada / brak linii wzroku), push-scroll kamery
+z martwą strefą, anulowanie rozkazu nowym kliknięciem. Klawiatura i pad pozostają w pełni sprawne.
 
 **v0.2.x** — więcej typów budynków (kościół, szkoła, bar), pojazd jako schronienie,
 alarm samochodowy, więcej broni, autotile krawędzi i więcej wariantów kafli.

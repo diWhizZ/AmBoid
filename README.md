@@ -63,7 +63,7 @@ Opcjonalnie własne miasteczko i tryb grafiki:
 | --- | --- |
 | `W A S D` / strzałki | ruch (schemat EKRAN lub IZO — patrz niżej) |
 | `Shift` / `Ctrl` | bieg / skradanie |
-| `Spacja` / LPM | atak |
+| `Spacja` / **PPM** | atak (PPM — w stronę kursora) |
 | `E` | drzwi, przeszukanie, podniesienie łupu, zabicie okna |
 | `Q` | użyj wybranego przedmiotu |
 | `1`–`0` | wybór slotu |
@@ -71,6 +71,26 @@ Opcjonalnie własne miasteczko i tryb grafiki:
 | `G` | przełącz tryb grafiki: OCS 32 → AGA 64 → RTG |
 | `K` | przełącz schemat ruchu: **EKRAN** ↔ **IZO** |
 | `Esc` | pauza |
+
+**Mysz (0.2.3, etap 1).** Klikasz świat, a ocalały sam idzie wyznaczoną trasą:
+
+| Mysz | Akcja |
+| --- | --- |
+| **LPM** na ziemi | idź do kursora; trzymanie LPM = podążanie za kursorem |
+| **LPM** na drzwiach / pojemniku / łóżku / łupie | podejdź i wykonaj tę jedną akcję |
+| **LPM** na zombie | podejdź i stań obok — **bez automatycznego ataku** |
+| **PPM** | atak lub strzał w stronę kursora |
+| kursor poza planszą, na HUD | rozkaz nie jest wydawany |
+
+Trasa rysowana jest kropkami, kafel pod kursorem ma kolor zależny od akcji
+(biały — idź, złoty — interakcja, żółty — zombie, czerwony — blokada,
+szary — brak linii wzroku do zombie).
+Nowe kliknięcie anuluje poprzedni rozkaz, a kamera przesuwa się za kursorem
+(martwa strefa wokół środka ekranu). Klawiatura i pad działają bez zmian.
+
+<p align="center">
+  <img src="docs/screens/10-mysz.png" alt="Mysz: kursor nad drzwiami, ścieżka kropkami" width="640">
+</p>
 
 **Dwa schematy ruchu.** Izometria 2:1 nie ma jednej „oczywistej” strzałki —
 dlatego są dwa schematy, a wybór zapisuje się w przeglądarce:

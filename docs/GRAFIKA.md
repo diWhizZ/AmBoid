@@ -1,6 +1,6 @@
 # AMBOID — plan poprawy strony graficznej
 
-Stan na **v0.2.2**. Punkt wyjścia: 320×200, izometria 2:1, kafle 32×16, ściany
+Stan na **v0.2.3** (grafika bez zmian względem 0.2.2). Punkt wyjścia: 320×200, izometria 2:1, kafle 32×16, ściany
 20 px, wszystko proceduralne, palety 32 (OCS) / 64 (AGA, RTG).
 
 Dokument odpowiada na pytanie „co możemy zrobić, żeby gra wyglądała lepiej” —
@@ -8,7 +8,7 @@ w kolejności od rzeczy o największym efekcie do najbardziej kosztownych.
 
 ---
 
-## 1. Co już jest (v0.2.2)
+## 1. Co już jest (stan 0.2.2/0.2.3)
 
 - trzy profile grafiki: OCS 32, AGA 64 i RTG z prawdziwym światłem RGB,
 - pięć tonów na materiał (AGA/RTG) i mapowanie półtonów do bazy w OCS,
