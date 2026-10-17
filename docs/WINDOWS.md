@@ -228,6 +228,7 @@ punkt 1 lub 3 zadziała zawsze.
 
 | Objaw | Przyczyna / rozwiązanie |
 | --- | --- |
+| `git` nie jest rozpoznawane | Git **nie jest potrzebny** — użyj pobranego ZIP i wejdź do jego folderu, np. `cd "D:\pobrane\zomboid\AmBoid-arena-cb222f77-amboid"`. Albo doinstaluj Git for Windows i otwórz nowe okno PowerShell |
 | `npm` nie jest rozpoznawane | Node bez PATH — przeinstaluj z opcją „Add to PATH", otwórz **nowe** okno PowerShell |
 | `npm.ps1 cannot be loaded…` | polityka PowerShell — użyj `npm.cmd start` albo `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (sekcja 5) |
 | `npm` działa, ale nie ma gry | jesteś w `C:\WINDOWS\system32` — wejdź do katalogu projektu (`cd C:\Gry\AmBoid`) |
