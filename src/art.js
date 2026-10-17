@@ -3,7 +3,7 @@
 
 import { C, X, TRANSPARENT } from './palette.js';
 import { PixelBuffer } from './pixel.js';
-import { makeRng, hash2 } from './rng.js';
+import { makeRng, hash2, hashInt } from './rng.js';
 
 const TILE_W = 32;
 const TILE_H = 16;
@@ -16,27 +16,83 @@ const DIAMOND = [
 
 export const WALL_H = 20;
 
-// Ramy tonalne materiałów (od światła do cienia). W trybie OCS półtony AGA
-// wracają do kolorów bazowych, więc obraz jest identyczny; w AGA dają płynne
-// przejścia. Gradient na kaflu liczymy raz i wybieramy ton z rampy.
+// Ramy tonalne materiałów — OD CIENIA DO ŚWIATŁA, monotonicznie po luminancji
+// (kolejność sprawdza test). W trybie OCS półtony AGA wracają do kolorów
+// bazowych, więc obraz jest identyczny; w AGA dają płynne przejścia.
+// Od v0.2.5 rampa NIE jest gradientem pojedynczego rombu: ton wybiera materiał
+// i zabrudzenie, nigdy fałszywe oświetlenie kafla.
 const RAMPS = {
-  grass: [X.GRASS_LIT, C.GRASS_LIGHT, X.GRASS_MID, C.GRASS, C.GRASS_DARK],
-  dirt: [C.WOOD_LIGHT, X.DIRT_LIT, C.GOLD, X.DIRT_MID, C.WOOD],
-  asphalt: [X.ASPHALT_HI, C.ASPHALT_LIGHT, X.ASPHALT_MID, C.ASPHALT, C.ASPHALT_DARK],
-  sidewalk: [X.CONCRETE_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.ASPHALT],
-  wood: [X.WOOD_WARM, C.WOOD_LIGHT, X.WOOD_MID, C.WOOD, C.WOOD_DARK],
-  tile: [X.CONCRETE_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.STEEL],
-  carpet: [X.BLOOD_FRESH, C.BLOOD, X.BLOOD_DRY, C.BLOOD_DARK, C.WOOD_DARK],
-  water: [X.WATER_HI, C.STEEL, X.WATER_MID, C.BLUE, X.WATER_DEEP],
-  concrete: [X.CONCRETE_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.ASPHALT_DARK],
-  gravel: [X.ASPHALT_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.ASPHALT_DARK],
+  grass: [C.GRASS_DARK, X.GRASS_MID, C.GRASS, C.GRASS_LIGHT, X.GRASS_LIT],
+  dirt: [C.WOOD_DARK, C.WOOD, X.DIRT_MID, C.WOOD_LIGHT, C.GOLD, X.DIRT_LIT],
+  asphalt: [C.ASPHALT_DARK, C.ASPHALT, X.ASPHALT_MID, C.ASPHALT_LIGHT, X.ASPHALT_HI],
+  sidewalk: [C.ASPHALT, C.CONCRETE_DARK, X.CONCRETE_MID, C.CONCRETE, X.CONCRETE_HI],
+  wood: [C.WOOD_DARK, X.WOOD_MID, C.WOOD, C.WOOD_LIGHT],
+  tile: [C.CONCRETE_DARK, X.CONCRETE_MID, C.CONCRETE, X.CONCRETE_HI],
+  carpet: [C.BLOOD_DARK, C.WOOD_DARK, C.BLOOD],
+  water: [X.WATER_DEEP, C.BLUE, X.WATER_MID, X.WATER_HI],
+  concrete: [C.ASPHALT_DARK, C.CONCRETE_DARK, X.CONCRETE_MID, C.CONCRETE, X.CONCRETE_HI],
+  gravel: [C.ASPHALT, C.CONCRETE_DARK, X.ASPHALT_HI, C.CONCRETE],
 };
 
+// Indeks „spokojnego tła" w rampie każdego materiału.
+const BASE_TONE = {
+  grass: 2,
+  dirt: 2,
+  asphalt: 1,
+  sidewalk: 2,
+  wood: 2,
+  tile: 2,
+  carpet: 0,
+  water: 1,
+  concrete: 2,
+  gravel: 1,
+};
 
+// Maska rombu 32×16 testem środka piksela: dokładnie 256 nieprzezroczystych
+// pikseli. Romby teselują płaszczyznę bez dziur i BEZ podwójnego pokrycia
+// (stara maska z fillPoly miała 272 px, więc ~6% pikseli dużej płaszczyzny
+// było nadpisywanych przez sąsiada rysowanego później — stąd poszarpane szwy
+// na granicach materiałów). Globalny PixelBuffer.fillPoly pozostaje nietknięty:
+// korzystają z niego obiekty i postacie.
 function diamondMask() {
   const pb = new PixelBuffer(TILE_W, TILE_H);
-  pb.fillPoly(DIAMOND, 1);
+  for (let y = 0; y < TILE_H; y++) {
+    const half = TILE_W / 2 - (TILE_W / TILE_H) * Math.abs(y + 0.5 - TILE_H / 2);
+    const a = Math.ceil(TILE_W / 2 - 0.5 - half);
+    const b = Math.floor(TILE_W / 2 - 0.5 + half);
+    for (let x = a; x <= b; x++) pb.data[y * TILE_W + x] = 1;
+  }
   return pb;
+}
+
+// Zmniejszenie maski o n pikseli — detal trzymany z dala od krawędzi rombu,
+// żeby sąsiedni kafel nie ucinał go w połowie kształtu.
+function erodeMask(mask, n) {
+  let cur = mask;
+  for (let k = 0; k < n; k++) {
+    const out = new PixelBuffer(mask.w, mask.h);
+    for (let y = 0; y < mask.h; y++) {
+      for (let x = 0; x < mask.w; x++) {
+        if (cur.get(x, y) !== 1) continue;
+        if (cur.get(x - 1, y) !== 1 || cur.get(x + 1, y) !== 1 || cur.get(x, y - 1) !== 1 || cur.get(x, y + 1) !== 1) continue;
+        out.data[y * mask.w + x] = 1;
+      }
+    }
+    cur = out;
+  }
+  return cur;
+}
+
+// Środki pikseli rombu w UV płaszczyzny podłogi: u,v ∈ [0,1) na jeden kafel,
+// u rośnie wzdłuż osi X świata, v wzdłuż osi Y. Deski, fugi i płyty liczone
+// w (tileX+u, tileY+v) leżą w osiach podłogi i są ciągłe między kaflami.
+const UV_U = new Float64Array(TILE_W * TILE_H);
+const UV_V = new Float64Array(TILE_W * TILE_H);
+for (let y = 0; y < TILE_H; y++) {
+  for (let x = 0; x < TILE_W; x++) {
+    UV_U[y * TILE_W + x] = (x + 0.5 - TILE_W / 2) / TILE_W + (y + 0.5) / TILE_H;
+    UV_V[y * TILE_W + x] = (y + 0.5) / TILE_H - (x + 0.5 - TILE_W / 2) / TILE_W;
+  }
 }
 
 function outlined(pb, color = C.OUTLINE) {
@@ -56,132 +112,397 @@ function outlined(pb, color = C.OUTLINE) {
 }
 
 // ---------------------------------------------------------------------------
-// PODŁOGI / TEREN
+// PODŁOGI / TEREN (v0.2.5)
+//
+// Zasady generowania:
+//  * ZERO oświetlenia pojedynczego rombu — usunięty gradient gx z v0.2.4,
+//    który powielony na płaskiej powierzchni dawał ukośne pasy;
+//  * wzory strukturalne (fugi płyt, deski, siatka ceramiki, dylatacje) liczone
+//    w UV płaszczyzny podłogi, więc są ciągłe między kaflami i nie „pływają"
+//    w osiach ekranu; okres wzoru = siatka faz (lattice) danego materiału;
+//  * detale (pęknięcia, kępy darni, kamienie, łatki) to celowe skupiska
+//    pikseli, trzymane ≥1 px od krawędzi rombu — sąsiad nigdy ich nie ucina;
+//  * wariant = dokładna faza siatki strukturalnej (z współrzędnych świata)
+//    + indeks detalu z hasza seed⊕współrzędne; nigdy Math.random() w klatce;
+//  * średnia jasność wariantów jednego materiału jest zbliżona (koniec
+//    szachownicy z losowo jaśniejszych/ciemniejszych rombów).
 // ---------------------------------------------------------------------------
-function makeGround(kind, variant) {
-  const rng = makeRng(0xbeef + variant * 977 + kind.length * 331 + kind.charCodeAt(0) * 17);
-  const pb = new PixelBuffer(TILE_W, TILE_H);
-  const mask = diamondMask();
 
-  const ramp = RAMPS[kind] || RAMPS.grass;
+// Specyfikacja materiałów: lattice = okres wzoru strukturalnego w kaflach
+// (liczba faz X×Y), details = liczba zestawów detalu na fazę, salt = ziarno
+// hasza doboru detalu. Liczba wariantów = lx*ly*details (test ją sprawdza).
+const GROUND_SPEC = {
+  grass: { lattice: [1, 1], details: 6, salt: 0x6a11 },
+  dirt: { lattice: [1, 1], details: 5, salt: 0x6d12 },
+  asphalt: { lattice: [1, 1], details: 6, salt: 0xa5f1 },
+  sidewalk: { lattice: [2, 2], details: 2, salt: 0x51de },
+  wood: { lattice: [2, 2], details: 2, salt: 0x00d0 },
+  tile: { lattice: [1, 1], details: 4, salt: 0x711e },
+  carpet: { lattice: [1, 1], details: 4, salt: 0xca9e },
+  water: { lattice: [1, 1], details: 4, salt: 0x0a7e },
+  concrete: { lattice: [2, 1], details: 2, salt: 0xc0c1 },
+  gravel: { lattice: [1, 1], details: 5, salt: 0x94ae },
+};
 
-  // gradient + szum: 64-kolorowa AGA dostaje pięć tonów na materiał,
-  // OCS widzi z tego trzy kolory bazowe (identyczny układ plam).
-  for (let y = 0; y < TILE_H; y++) {
-    for (let x = 0; x < TILE_W; x++) {
-      if (mask.get(x, y) === TRANSPARENT) continue;
-      const n = hash2(x + variant * 37, y + variant * 91, kind.length);
-      const gx = (x - y * 2 + TILE_H) / (TILE_W + TILE_H);
-      let tone = Math.floor(gx * 2.4 + (n - 0.5) * 2.0 + 0.4);
-      if (tone < 0) tone = 0;
-      else if (tone > 4) tone = 4;
-      pb.set(x, y, ramp[tone]);
+export const GROUND_KINDS = Object.keys(GROUND_SPEC);
+export const GROUND_RAMPS = RAMPS;
+
+const frac = (x) => x - Math.floor(x);
+const MASK = diamondMask();
+const MASK_INNER = erodeMask(MASK, 1);
+
+// Losowy piksel wewnątrz rombu (z zapasem od krawędzi).
+function randInner(rng, tries = 24) {
+  for (let i = 0; i < tries; i++) {
+    const x = rng.int(2, TILE_W - 3);
+    const y = rng.int(2, TILE_H - 3);
+    if (MASK_INNER.get(x, y) === 1) return [x, y];
+  }
+  return [16, 8];
+}
+
+// Skupisko pikseli (kępa, plama, kamień) — celowy kształt, nie szum per piksel.
+function blobIn(pb, inner, rng, cx, cy, r, color, density = 1) {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy * dy > r * r) continue;
+      if (density < 1 && rng.next() > density) continue;
+      if (inner.get(cx + dx, cy + dy) !== 1) continue;
+      pb.set(cx + dx, cy + dy, color);
     }
   }
+}
 
-  // charakterystyczne detale
-  if (kind === 'grass') {
-    for (let i = 0; i < 4 + variant; i++) {
-      const x = rng.int(6, 25);
-      const y = rng.int(3, 12);
-      if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, rng.chance(0.3) ? X.GRASS_LIT : C.GRASS_LIGHT);
-      pb.set(x, y - 1, C.GRASS_LIGHT);
-      if (rng.chance(0.5)) pb.set(x + 1, y, rng.chance(0.25) ? X.GRASS_DEEP : C.GRASS_DARK);
+// Nieregularne pęknięcie: kierunki główne w osiach podłogi (±U, ±V → na
+// ekranie (±2,±1)), z drobnym jitterem. Krótkie i pojedyncze — bez
+// powtarzalnych prążków z v0.2.4.
+const CRACK_DIRS = [[2, 1], [-2, 1], [2, -1], [-2, -1]];
+const CRACK_JITTER = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [-1, 1]];
+function crackIn(pb, inner, rng, x0, y0, len, color, shoulder = null) {
+  const dir = rng.pick(CRACK_DIRS);
+  let x = x0;
+  let y = y0;
+  for (let i = 0; i < len; i++) {
+    if (inner.get(x, y) === 1) {
+      pb.set(x, y, color);
+      if (shoulder != null && rng.chance(0.3) && inner.get(x, y + 1) === 1) pb.set(x, y + 1, shoulder);
     }
-    if (variant === 2) {
-      const x = rng.int(8, 22);
-      const y = rng.int(5, 11);
-      pb.set(x, y, C.YELLOW);
-      pb.set(x + 1, y, C.BONE);
+    const step = rng.chance(0.4) ? rng.pick(CRACK_JITTER) : dir;
+    x += step[0];
+    y += step[1];
+    if (x < 0 || y < 0 || x >= TILE_W || y >= TILE_H) break;
+  }
+}
+
+// Ciągła linia w osi U lub V płaszczyzny (słoje desek, smugi refleksów).
+function floorStreak(pb, inner, rng, x0, y0, len, alongU, color) {
+  let x = x0;
+  let y = y0;
+  for (let i = 0; i < len; i++) {
+    if (inner.get(x, y) === 1) pb.set(x, y, color);
+    x += alongU ? 2 : -2;
+    y += 1;
+    if (rng.chance(0.25)) y -= rng.chance(0.5) ? 1 : -1;
+    if (x < 0 || y < 0 || x >= TILE_W || y >= TILE_H) break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rysowanie materiałów. `g` daje dostęp do bufora, RNG wariantu, fazy siatki
+// oraz ciągłych współrzędnych podłogi U/V (faza + UV piksela).
+// ---------------------------------------------------------------------------
+const GROUND_DRAW = {
+  // Jezdnia: ciemna, spokojna masa; subtelne kruszywo, nieliczne pęknięcia
+  // i łatki. Bez dwóch powtarzalnych prążków i bez jasnych obwódek rombów.
+  asphalt(g) {
+    const { pb, rng, detail } = g;
+    const agg = 5 + detail;
+    for (let i = 0; i < agg; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(1, 2), rng.chance(0.5) ? X.ASPHALT_MID : C.ASPHALT_DARK, 0.75);
     }
-  } else if (kind === 'dirt') {
-    for (let i = 0; i < 7; i++) {
-      const x = rng.int(3, 28);
-      const y = rng.int(2, 13);
-      if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, rng.chance(0.5) ? C.WOOD_DARK : C.CONCRETE_DARK);
+    if (detail >= 3) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(2, 3), detail % 2 ? C.ASPHALT_DARK : X.ASPHALT_MID, 0.5);
     }
-  } else if (kind === 'asphalt' || kind === 'concrete') {
+    const cracks = detail === 0 ? 0 : detail === 4 ? 2 : 1;
+    for (let i = 0; i < cracks; i++) {
+      const [cx, cy] = randInner(rng);
+      crackIn(pb, MASK_INNER, rng, cx, cy, rng.int(4, 8), C.ASPHALT_DARK, X.ASPHALT_MID);
+    }
+  },
+
+  // Trawa: stonowana zieleń, nieregularne skupiska darni i przerzedzenia.
+  grass(g) {
+    const { pb, rng, detail } = g;
+    // kępy darni: liczba silnie zależna od wariantu, żeby sąsiednie kafle
+    // nie niosły tego samego rytmu „jedna kępa na kafel"
+    const dark = 4 + detail;
+    for (let i = 0; i < dark; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(1, 2), rng.chance(0.6) ? X.GRASS_MID : C.GRASS_DARK, 0.8);
+    }
+    const light = 2 + ((detail * 3) % 4);
+    for (let i = 0; i < light; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(1, 2), C.GRASS_LIGHT, 0.55);
+    }
+    // źdźbła: nieliczne, dwupikselowe — przeżywają pomniejszenie 0,75×
+    const blades = 1 + (detail % 2);
+    for (let i = 0; i < blades; i++) {
+      const [cx, cy] = randInner(rng);
+      if (MASK_INNER.get(cx, cy - 1) === 1) {
+        pb.set(cx, cy, C.GRASS_LIGHT);
+        pb.set(cx, cy - 1, rng.chance(0.2) ? X.GRASS_LIT : C.GRASS_LIGHT);
+      }
+    }
+    // przerzedzenie: rzadko (1 wariant na 6) i przygaszone — bez rudej plamy
+    // i bez kwiatka powtarzanego co kilka kafli (zarzut wobec v0.2.4)
+    if (detail === 5) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 2, X.DIRT_MID, 0.22);
+      blobIn(pb, MASK_INNER, rng, cx + 1, cy, 1, C.GRASS_DARK, 0.5);
+    }
+  },
+
+  // Chodnik: czytelne płyty 2×2 kafle, delikatne fugi w osiach izometrii,
+  // uszkodzenia sporadyczne. Krawężnik rysuje scene.js tylko na rzeczywistej
+  // granicy z jezdnią — nie ma go w atlasie.
+  sidewalk(g) {
+    const { pb, rng, detail } = g;
+    const G = 0.045;
+    g.each((x, y, u, v) => {
+      const fu = frac(u / 2);
+      const fv = frac(v / 2);
+      if (fu < G || fu > 1 - G || fv < G || fv > 1 - G) {
+        pb.set(x, y, C.CONCRETE_DARK);
+        return;
+      }
+      const h = hash2(Math.floor(u / 2), Math.floor(v / 2), 811);
+      if (h > 0.55) pb.set(x, y, C.CONCRETE);
+      else if (hash2(Math.floor(u * 8), Math.floor(v * 8), 977) > 0.86) pb.set(x, y, C.CONCRETE);
+    });
+    if (detail === 1) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 1, C.CONCRETE_DARK, 0.8);
+      crackIn(pb, MASK_INNER, rng, cx, cy, rng.int(3, 5), C.CONCRETE_DARK);
+      pb.set(20, 9, C.CONCRETE_DARK);
+      pb.set(20, 10, C.CONCRETE_DARK);
+    }
+  },
+
+  // Ziemia: nieregularne płaty, spokojne ziarno, pojedyncze kamienie.
+  dirt(g) {
+    const { pb, rng, detail } = g;
+    for (let i = 0; i < 5; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(1, 3), rng.chance(0.5) ? C.WOOD : C.GOLD, 0.6);
+    }
     for (let i = 0; i < 4; i++) {
-      const x = rng.int(2, 29);
-      const y = rng.int(1, 14);
-      if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, rng.chance(0.5) ? C.ASPHALT : C.ASPHALT_DARK);
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 1, rng.chance(0.5) ? X.DIRT_LIT : C.WOOD_DARK, 0.7);
     }
-    if (kind === 'asphalt') {
-      // ślady opon na jezdni
-      for (let x = 3; x < 29; x += 2) {
-        if (mask.get(x, 5) !== TRANSPARENT) pb.set(x, 5, C.ASPHALT_DARK);
-        if (mask.get(x, 11) !== TRANSPARENT) pb.set(x, 11, C.ASPHALT_DARK);
+    if (detail >= 3) {
+      const [cx, cy] = randInner(rng);
+      if (MASK_INNER.get(cx + 1, cy) === 1 && MASK_INNER.get(cx, cy + 1) === 1) {
+        pb.set(cx, cy, C.CONCRETE);
+        pb.set(cx + 1, cy, C.CONCRETE_DARK);
+        pb.set(cx, cy + 1, C.CONCRETE_DARK);
       }
     }
-    if (kind === 'concrete') {
-      // szczeliny dylatacyjne
-      for (let x = 3; x < 29; x++) {
-        if (mask.get(x, 8) !== TRANSPARENT && x % 7 !== 0) pb.set(x, 8, C.ASPHALT_DARK);
+  },
+
+  // Beton: duże spokojne pola z dylatacją co 2 kafle, drobne ubytki,
+  // rzadkie włosowate pęknięcia. Żadnej poziomej kreski na każdym kaflu.
+  concrete(g) {
+    const { pb, rng, detail } = g;
+    const G = 0.04;
+    g.each((x, y, u, v) => {
+      const fu = frac(u / 2);
+      if (fu < G || fu > 1 - G) {
+        pb.set(x, y, C.CONCRETE_DARK);
+        return;
       }
+      if (hash2(Math.floor(u * 8), Math.floor(v * 8), 977) > 0.88) pb.set(x, y, C.CONCRETE);
+    });
+    for (let i = 0; i < 3; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 1, C.CONCRETE_DARK, 0.6);
     }
-  } else if (kind === 'sidewalk') {
-    for (let i = 0; i < 8; i++) {
-      const x = rng.int(3, 28);
-      const y = rng.int(2, 13);
-      if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, rng.chance(0.33) ? X.CONCRETE_HI : rng.chance(0.5) ? C.ASPHALT : C.CONCRETE);
+    if (detail === 1) {
+      const [cx, cy] = randInner(rng);
+      crackIn(pb, MASK_INNER, rng, cx, cy, rng.int(4, 7), C.CONCRETE_DARK);
+      pb.set(15, 8, C.CONCRETE_DARK);
+      pb.set(16, 8, C.CONCRETE_DARK);
     }
-    // krawężnik po jednej stronie (delikatnie)
-    for (let x = 2; x < 30; x++) {
-      const yTop = 8 + Math.round((x - 16) * 0.5);
-      if (pb.get(x, yTop + 1) !== TRANSPARENT) pb.set(x, yTop + 1, C.ASPHALT);
-    }
-  } else if (kind === 'wood') {
-    // deski wzdłuż osi X mapy
-    for (let y = 1; y < TILE_H; y += 3) {
-      for (let x = 0; x < TILE_W; x++) {
-        if (mask.get(x, y) !== TRANSPARENT) pb.set(x, y, C.WOOD_DARK);
-        if (mask.get(x, y + 1) !== TRANSPARENT && hash2(x, y, 7) > 0.4) pb.set(x, y + 1, hash2(x, y, 9) > 0.7 ? X.WOOD_WARM : C.WOOD_LIGHT);
+  },
+
+  // Deski w osiach podłogi: spoiny ciągłe w osi X świata, łączenia desek
+  // przesunięte co rząd, dyskretne słoje i umiarkowana różnica jasności.
+  wood(g) {
+    const { pb, rng, detail, phaseY } = g;
+    const jointU = phaseY & 1;
+    g.each((x, y, u, v) => {
+      const rv = frac(v);
+      if (rv < 0.06 || rv > 0.94) {
+        pb.set(x, y, C.WOOD_DARK);
+        return;
       }
+      const ju = frac((u - jointU) / 2);
+      if (ju < 0.03 || ju > 0.97) {
+        pb.set(x, y, C.WOOD_DARK);
+        return;
+      }
+      const h = hash2(Math.floor(v), 7, 313);
+      if (h > 0.6) pb.set(x, y, X.WOOD_MID);
+      else if (hash2(Math.floor(u * 4), Math.floor(v * 4), 547) > 0.82) pb.set(x, y, X.WOOD_MID);
+    });
+    const grains = 2 + (detail & 1);
+    for (let i = 0; i < grains; i++) {
+      const [cx, cy] = randInner(rng);
+      floorStreak(pb, MASK_INNER, rng, cx, cy, rng.int(5, 10), true, rng.chance(0.5) ? X.WOOD_MID : C.WOOD_LIGHT);
+    }
+  },
+
+  // Ceramika: spójna siatka 2×2 płytek na kafel w perspektywie podłogi,
+  // bez ekranowej prostokątnej szachownicy.
+  tile(g) {
+    const { pb, rng, detail } = g;
+    const G = 0.05;
+    g.each((x, y, u, v) => {
+      const fu = frac(u * 2);
+      const fv = frac(v * 2);
+      if (fu < G || fv < G) {
+        pb.set(x, y, C.CONCRETE_DARK);
+        return;
+      }
+      const cu = Math.floor(u * 2);
+      const cv = Math.floor(v * 2);
+      pb.set(x, y, (cu + cv) & 1 ? C.CONCRETE : X.CONCRETE_MID);
+    });
+    if (detail === 1) {
+      crackIn(pb, MASK_INNER, rng, 13, 7, 5, C.CONCRETE_DARK);
+    }
+    if (detail === 2) {
+      const [cx, cy] = randInner(rng);
+      crackIn(pb, MASK_INNER, rng, cx, cy, 4, C.CONCRETE_DARK);
+      pb.set(17, 9, C.CONCRETE_DARK);
+      pb.set(18, 9, C.CONCRETE_DARK);
+    }
+    if (detail === 3) {
+      blobIn(pb, MASK_INNER, rng, 14, 8, 2, X.CONCRETE_MID, 0.5);
+    }
+  },
+
+  // Wykładzina: matowa, ciemna powierzchnia z subtelnym przetarciem.
+  carpet(g) {
+    const { pb, rng, detail } = g;
+    for (let i = 0; i < 3; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(2, 3), C.BLOOD, 0.3);
+    }
+    if (detail === 1) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 2, C.WOOD_DARK, 0.5);
+      pb.set(16, 8, C.WOOD_DARK);
+    }
+    if (detail === 2) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 2, C.WOOD_DARK, 0.4);
+    }
+    if (detail === 3) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 1, C.BLOOD, 0.55);
+    }
+  },
+
+  // Woda: spokojna masa z głębią i ograniczonymi, czytelnymi refleksami.
+  water(g) {
+    const { pb, rng, detail } = g;
+    for (let i = 0; i < 2; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, rng.int(2, 4), X.WATER_DEEP, 0.6);
+    }
+    const n = 1 + (detail % 3);
+    for (let i = 0; i < n; i++) {
+      const [cx, cy] = randInner(rng);
+      floorStreak(pb, MASK_INNER, rng, cx, cy, rng.int(3, 6), true, i === 0 ? X.WATER_HI : X.WATER_MID);
+    }
+  },
+
+  // Żwir: skupiska drobnych kamieni na spokojnym tle, nie biały szum.
+  gravel(g) {
+    const { pb, rng } = g;
+    for (let i = 0; i < 9; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 1, rng.chance(0.5) ? C.CONCRETE : X.ASPHALT_MID, 0.9);
     }
     for (let i = 0; i < 3; i++) {
-      const x = rng.int(4, 27);
-      pb.set(x, rng.int(4, 11), C.WOOD_DARK);
-    }
-  } else if (kind === 'tile') {
-    for (let y = 0; y < TILE_H; y++) {
-      for (let x = 0; x < TILE_W; x++) {
-        if (mask.get(x, y) === TRANSPARENT) continue;
-        const u = Math.floor((x + 16) / 8);
-        const v = Math.floor((y + 8) / 4);
-        pb.set(x, y, (u + v) & 1 ? C.CONCRETE : C.BONE);
-        if (((x + 16) % 8 === 0) || ((y + 8) % 4 === 0)) pb.set(x, y, C.CONCRETE_DARK);
+      const [cx, cy] = randInner(rng);
+      if (MASK_INNER.get(cx + 1, cy) === 1) {
+        pb.set(cx, cy, X.ASPHALT_HI);
+        pb.set(cx + 1, cy, C.ASPHALT);
       }
     }
-  } else if (kind === 'carpet') {
-    for (let y = 0; y < TILE_H; y++) {
-      for (let x = 0; x < TILE_W; x++) {
-        if (mask.get(x, y) === TRANSPARENT) continue;
-        const n = hash2(x, y, 42);
-        pb.set(x, y, n > 0.75 ? C.BLOOD : n > 0.4 ? C.BLOOD_DARK : C.WOOD_DARK);
-      }
+    for (let i = 0; i < 2; i++) {
+      const [cx, cy] = randInner(rng);
+      blobIn(pb, MASK_INNER, rng, cx, cy, 2, C.ASPHALT, 0.5);
     }
-  } else if (kind === 'water') {
-    for (let y = 0; y < TILE_H; y++) {
-      for (let x = 0; x < TILE_W; x++) {
-        if (mask.get(x, y) === TRANSPARENT) continue;
-        const w = Math.sin((x + variant * 6) * 0.5 + y * 1.2) + Math.sin(y * 0.9 + variant);
-        pb.set(x, y, w > 1.25 ? X.WATER_HI : w > 1.1 ? C.STEEL : w > 0.2 ? C.BLUE : w > -0.6 ? C.SLATE_DARK : X.WATER_DEEP);
-      }
-    }
-  } else if (kind === 'gravel') {
-    for (let i = 0; i < 14; i++) {
-      const x = rng.int(1, 30);
-      const y = rng.int(1, 14);
-      if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, rng.chance(0.5) ? C.ASPHALT_LIGHT : C.CONCRETE);
-    }
-  }
+  },
+};
 
+// Dobór wariantu: deterministyczny, zależny od seeda i współrzędnych świata.
+// Faza siatki strukturalnej musi być DOKŁADNA (parzystość współrzędnych),
+// bo tylko wtedy fugi i deski schodzą się między kaflami; zestaw detalu
+// bierze się z hasza, nie z liniowego modulo i nie z Math.random().
+export function groundVariantIndex(kind, x, y, seed) {
+  const spec = GROUND_SPEC[kind];
+  if (!spec) return 0;
+  const [lx, ly] = spec.lattice;
+  const phaseX = ((x % lx) + lx) % lx;
+  const phaseY = ((y % ly) + ly) % ly;
+  const detail = spec.details > 1 ? hashInt(x, y, (seed ^ spec.salt) >>> 0, spec.details) : 0;
+  // kolejność bitów musi odpowiadać dekodowaniu w buildGroundTile:
+  // index = (phaseY*lx + phaseX) + lx*ly*detail
+  return phaseY * lx + phaseX + lx * ly * detail;
+}
+
+export function groundVariantCount(kind) {
+  const spec = GROUND_SPEC[kind];
+  return spec ? spec.lattice[0] * spec.lattice[1] * spec.details : 0;
+}
+
+function buildGroundTile(kind, index) {
+  const spec = GROUND_SPEC[kind];
+  const [lx, ly] = spec.lattice;
+  const phaseX = index % lx;
+  const phaseY = Math.floor(index / lx) % ly;
+  const detail = Math.floor(index / (lx * ly));
+  const pb = new PixelBuffer(TILE_W, TILE_H);
+  const rng = makeRng((spec.salt ^ Math.imul(index + 1, 0x9e3779b1) ^ Math.imul(kind.length, 0x85ebca6b)) >>> 0);
+  const U = (x, y) => phaseX + UV_U[y * TILE_W + x];
+  const V = (x, y) => phaseY + UV_V[y * TILE_W + x];
+  const each = (fn) => {
+    for (let y = 0; y < TILE_H; y++) {
+      for (let x = 0; x < TILE_W; x++) {
+        const i = y * TILE_W + x;
+        if (MASK.data[i] !== 1) continue;
+        fn(x, y, U(x, y), V(x, y));
+      }
+    }
+  };
+  const ramp = RAMPS[kind] || RAMPS.grass;
+  const base = ramp[BASE_TONE[kind] == null ? 2 : BASE_TONE[kind]];
+  each((x, y) => pb.set(x, y, base));
+  (GROUND_DRAW[kind] || (() => {}))({ pb, rng, phaseX, phaseY, detail, U, V, each });
   return pb;
+}
+
+function makeGroundTiles(kind) {
+  const n = groundVariantCount(kind);
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(buildGroundTile(kind, i));
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1275,8 +1596,10 @@ function makeIcon(kind) {
 export function buildArt() {
   const art = { tiles: {}, walls: {}, props: {}, chars: {}, icons: {}, decals: {}, shadows: {} };
 
-  for (const kind of ['grass', 'dirt', 'asphalt', 'sidewalk', 'wood', 'tile', 'carpet', 'water', 'concrete', 'gravel']) {
-    art.tiles[kind] = [0, 1, 2].map((v) => makeGround(kind, v));
+  // Kafle terenu: liczba wariantów wynika z GROUND_SPEC (fazy siatki
+  // strukturalnej × zestawy detalu), nie z zaszytego „3".
+  for (const kind of GROUND_KINDS) {
+    art.tiles[kind] = makeGroundTiles(kind);
   }
 
   for (const mat of ['brick', 'concrete', 'wood']) {
