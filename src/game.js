@@ -103,6 +103,9 @@ export class Game {
       /* brak dostępu do localStorage */
     }
     this.controlScheme = CONTROL_SCHEMES[savedScheme] ? savedScheme : 'screen';
+    // Wektor z pada w przestrzeni ekranu; ma pierwszeństwo przed klawiszami
+    // i nie zależy od wybranego schematu (gałka w lewo = zawsze w lewo).
+    this.padVector = null;
     this.createMenuWorld();
   }
 
@@ -530,7 +533,19 @@ export class Game {
 
   // 8 kierunków: pojedynczy klawisz idzie po skosie ekranu,
   // dwa sąsiednie klawisze dają ruch po osi mapy.
+  setPadVector(dx, dy) {
+    if (!dx && !dy) {
+      this.padVector = null;
+      return;
+    }
+    this.padVector = { dx: Math.sign(dx), dy: Math.sign(dy) };
+  }
+
   getMoveVector() {
+    if (this.padVector) {
+      const { dx, dy } = this.padVector;
+      return { dx, dy, dir: this.facingFromDelta(dx, dy) };
+    }
     const dirs = new Set();
     for (const code of this.moveStack) {
       if (this.keys.has(code) && MOVE_CODES[code]) dirs.add(MOVE_CODES[code]);

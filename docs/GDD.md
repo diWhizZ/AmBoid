@@ -102,9 +102,10 @@ oczywistego mapowania WASD, więc gra daje wybór: **EKRAN** (W góra, S dół,
 A lewo, D prawo) i **IZO** (W ↖, D ↗, S ↘, A ↙). Dwa sąsiednie klawisze dają
 ruch po osi ekranu. Wybór jest pamiętany w `localStorage['amboid.controls']`.
 
-**Pad:** Gamepad API mapuje lewą gałkę i D-pad na ruch, A na atak, B na akcję,
-X na użycie, Y na latarkę, LB/RB na sloty, LT/RT na skradanie/bieg,
-Back na mapę, Start na pauzę.
+**Pad:** Gamepad API mapuje lewą gałkę i D-pad na ruch względem ekranu
+(niezależnie od schematu EKRAN/IZO), A na atak, B na akcję, X na użycie,
+Y na latarkę, LB/RB na sloty, LT/RT na skradanie/bieg, Back na mapę,
+Start na pauzę.
 
 **Doświadczenie:** +2 XP za trafienie, +4 za zabicie; co 12 XP poziom walki
 (+2 obrażeń bazowych). Czasopisma dają +6 XP.

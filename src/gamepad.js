@@ -54,16 +54,25 @@ export class GamepadInput {
     };
 
     const codes = new Set();
-    for (const i of Object.keys(DPAD_CODES)) {
-      if (down(Number(i))) codes.add(DPAD_CODES[i]);
-    }
-
+    // Kierunek w przestrzeni EKRANU: D-pad ma pierwszeństwo, potem gałka.
+    let sx = (down(15) ? 1 : 0) - (down(14) ? 1 : 0);
+    let sy = (down(13) ? 1 : 0) - (down(12) ? 1 : 0);
     const ax = (pad.axes && pad.axes[0]) || 0;
     const ay = (pad.axes && pad.axes[1]) || 0;
-    if (ay < -STICK_DEADZONE) codes.add('ArrowUp');
-    else if (ay > STICK_DEADZONE) codes.add('ArrowDown');
-    if (ax < -STICK_DEADZONE) codes.add('ArrowLeft');
-    else if (ax > STICK_DEADZONE) codes.add('ArrowRight');
+    if (!sx) sx = ax < -STICK_DEADZONE ? -1 : ax > STICK_DEADZONE ? 1 : 0;
+    if (!sy) sy = ay < -STICK_DEADZONE ? -1 : ay > STICK_DEADZONE ? 1 : 0;
+
+    if (game.mode === 'playing') {
+      // W grze pad nie udaje klawiszy: omija schemat EKRAN/IZO i zawsze
+      // porusza w stronę, w którą wskazuje gałka na ekranie.
+      game.setPadVector(sx + sy, sy - sx);
+    } else {
+      game.setPadVector(0, 0);
+      if (sy < 0) codes.add('ArrowUp');
+      else if (sy > 0) codes.add('ArrowDown');
+      if (sx < 0) codes.add('ArrowLeft');
+      else if (sx > 0) codes.add('ArrowRight');
+    }
 
     for (const i of Object.keys(BUTTON_CODES)) {
       if (down(Number(i))) codes.add(BUTTON_CODES[i]);
@@ -94,6 +103,7 @@ export class GamepadInput {
   }
 
   releaseAll(game) {
+    game.setPadVector(0, 0);
     if (!this.pressed.size) return;
     for (const code of this.pressed) game.keyUp(code);
     this.pressed.clear();

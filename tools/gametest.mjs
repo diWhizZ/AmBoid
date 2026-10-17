@@ -302,6 +302,22 @@ section('Obsługa pada (Gamepad API)');
   for (let i = 0; i < 100 && (g.player.moving || g.player.x === x1); i++) g.update(1 / 60);
   gp.poll(g, [pad([0, 0], [])]);
   check('gałka w lewo rusza gracza', g.player.x !== x1 || g.player.y !== y1);
+  // pad omija schemat ruchu: w IZO gałka w lewo nadal idzie w lewo ekranu
+  g.setControlScheme('iso');
+  teleport(g, spot.x, spot.y);
+  g.keys.clear();
+  g.moveStack = [];
+  const ix0 = isoX(g.player.vx, g.player.vy);
+  const iy0 = isoY(g.player.vx, g.player.vy);
+  gp.poll(g, [pad([-1, 0], [])]);
+  check('pad w grze nie wciska klawiszy-strzałek', ![...g.keys].some((k) => k.startsWith('Arrow')));
+  for (let i = 0; i < 100 && (g.player.moving || g.player.x === spot.x); i++) g.update(1 / 60);
+  gp.poll(g, [pad([0, 0], [])]);
+  const idx = isoX(g.player.vx, g.player.vy) - ix0;
+  const idy = isoY(g.player.vx, g.player.vy) - iy0;
+  check('IZO: gałka w lewo idzie w lewo ekranu', idx < 0 && Math.abs(idy) <= 8, `ekran ${idx},${idy}`);
+  g.setControlScheme('screen');
+
   // A = atak (Space)
   g.player.attackCd = 0;
   g.mode = 'playing';

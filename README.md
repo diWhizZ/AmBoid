@@ -85,7 +85,8 @@ W obu schematach dwa sąsiednie klawisze dają ruch po osi ekranu (np. w IZO
 `STEROWANIE: EKRAN` / `STEROWANIE: IZO`.
 
 **Pad (Gamepad API).** Podłączony pad działa od razu, bez konfiguracji
-(Chrome, Edge, Firefox; tryb XInput):
+(Chrome, Edge, Firefox; tryb XInput). Gałka i D-pad zawsze poruszają **względem
+ekranu** — niezależnie od tego, czy masz włączony schemat EKRAN, czy IZO:
 
 | Pad | Akcja |
 | --- | --- |
