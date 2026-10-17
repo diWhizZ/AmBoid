@@ -54,6 +54,9 @@ budowania ani instalacji pakietów — to czysty HTML5 + ES modules.
 Opcjonalnie własne miasteczko i tryb grafiki:
 `http://localhost:8080/?seed=ABC123&gfx=rtg` (`ocs`, `aga` lub `rtg`).
 
+**Windows — pełna instrukcja krok po kroku:** [docs/WINDOWS.md](docs/WINDOWS.md)
+(Node.js, PowerShell, porty, testy, typowe problemy).
+
 ### Sterowanie
 
 | Klawisz | Akcja |
@@ -130,6 +133,8 @@ sprawdza, że na ekranie jest dokładnie 0 pikseli spoza palety.
   światło RGB, struktura pamięci, format plików i lista cięć.
 - **[docs/GDD.md](docs/GDD.md)** — projekt gry: pętla rozgrywki, ekonomia,
   AI zombie, tabela przedmiotów, balans, UI.
+- **[docs/WINDOWS.md](docs/WINDOWS.md)** — uruchomienie prototypu pod Windows
+  krok po kroku: instalacja Node.js, `npm start`, wybór trybu, testy.
 - **[docs/amiga/](docs/amiga/)** — atlasy IFF ILBM do Deluxe Paint / Personal
   Paint: `docs/amiga/` (32 kolory, 5 bitplanów) i `docs/amiga/aga/`
   (64 kolory, 6 bitplanów), palety `.pal`, miasto `.amb`.
