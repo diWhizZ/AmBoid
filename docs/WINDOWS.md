@@ -54,12 +54,13 @@ w `main`).
 2. Zielony przycisk **Code** → **Download ZIP**.
 3. Kliknij prawym na pobrany plik → **Properties** → zaznacz **Unblock** → OK
    (opcjonalnie, ale ułatwia uruchamianie skryptów).
-4. **Extract All…** — rozpakuj do np. `C:\Gry\AmBoid`.
+4. **Extract All…** — rozpakuj do np. `C:\Gry`. Powstanie podfolder
+   `AmBoid-arena-cb222f77-amboid` (GitHub pakuje gałąź razem z nazwą).
    Nie uruchamiaj gry z podglądu archiwum.
-5. W PowerShell wejdź do katalogu (cudzysłowy, jeśli ścieżka ma spacje):
+5. W PowerShell wejdź do tego podfolderu (cudzysłowy, jeśli ścieżka ma spacje):
 
 ```powershell
-cd "C:\Gry\AmBoid"
+cd "C:\Gry\AmBoid-arena-cb222f77-amboid"
 ```
 
 Sprawdź, że widzisz pliki:
