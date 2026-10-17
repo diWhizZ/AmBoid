@@ -19,6 +19,8 @@ const game = new Game(screen, art, audio);
 // opcjonalny seed z adresu: ?seed=ABC123
 try {
   const params = new URLSearchParams(window.location.search);
+  const gfxParam = params.get('gfx');
+  if (gfxParam && ['ocs', 'aga', 'rtg'].includes(gfxParam)) game.setProfile(gfxParam, true);
   const seedParam = params.get('seed');
   if (seedParam) {
     const parsed = parseInt(seedParam, 36);
@@ -79,7 +81,7 @@ function frame(now) {
   last = now;
   game.update(dt);
   game.render();
-  screen.syncRGBA();
+  game.present();
   out32.set(screen.u32);
   ctx.putImageData(image, 0, 0);
   requestAnimationFrame(frame);

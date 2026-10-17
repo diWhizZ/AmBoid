@@ -72,42 +72,40 @@ export function drawTitle(game) {
   const tx = scr.w / 2;
 
   // --- logo ---
-  scr.rect(36, 8, 248, 44, C.VOID);
-  scr.frame(35, 7, 250, 46, C.SLATE_DARK);
-  scr.frame(34, 6, 252, 48, C.OUTLINE);
-  drawText(scr, 'AMBOID', tx + 3, 17, C.OUTLINE, { scale: 5, align: 'center' });
-  drawText(scr, 'AMBOID', tx, 14, C.BLOOD_DARK, { scale: 5, align: 'center' });
-  drawText(scr, 'AMBOID', tx - 1, 13, C.BONE, { scale: 5, align: 'center' });
-  drawText(scr, 'AMBOID', tx - 1, 12, C.WHITE, { scale: 5, align: 'center' });
-  scr.hline(74, 246, 54, C.BLOOD_DARK);
-  scr.hline(84, 234, 55, C.BLOOD);
-  for (const [x, len] of [[92, 4], [148, 7], [206, 3], [228, 5]]) {
-    scr.vline(x, 56, 56 + len, C.BLOOD_DARK);
-    scr.set(x, 57 + len, C.BLOOD);
+  scr.rect(36, 6, 248, 44, C.VOID);
+  scr.frame(35, 5, 250, 46, C.SLATE_DARK);
+  scr.frame(34, 4, 252, 48, C.OUTLINE);
+  drawText(scr, 'AMBOID', tx + 2, 14, C.OUTLINE, { scale: 5, align: 'center' });
+  drawText(scr, 'AMBOID', tx + 1, 12, C.BLOOD_DARK, { scale: 5, align: 'center' });
+  drawText(scr, 'AMBOID', tx, 10, C.WHITE, { scale: 5, align: 'center' });
+  for (const [x, len] of [[92, 3], [148, 6], [206, 2], [228, 4]]) {
+    scr.vline(x, 52, 52 + len, C.BLOOD_DARK);
+    scr.set(x, 53 + len, C.BLOOD);
   }
 
   // --- podtytuł ---
-  scr.rect(84, 58, 152, 14, C.SHADOW);
-  scr.frame(83, 57, 154, 16, C.SLATE_DARK);
-  txt(scr, 'PROJEKT Z', tx, 60, C.YELLOW, { scale: 2, align: 'center' });
+  scr.rect(84, 56, 152, 14, C.SHADOW);
+  scr.frame(83, 55, 154, 16, C.SLATE_DARK);
+  txt(scr, 'PROJEKT Z', tx, 58, C.YELLOW, { scale: 2, align: 'center' });
 
-  scr.rect(52, 76, 216, 24, C.SHADOW);
-  scr.frame(51, 75, 218, 26, C.SLATE_DARK);
-  txt(scr, 'IZOMETRYCZNY SURVIVAL 32 KOLORY', tx, 79, C.BONE, { align: 'center' });
-  txt(scr, 'AMIGA 500 / 1200  ·  HTML5', tx, 89, C.STEEL, { align: 'center' });
+  // --- warianty sprzętowe ---
+  scr.rect(40, 74, 240, 22, C.SHADOW);
+  scr.frame(39, 73, 242, 24, C.SLATE_DARK);
+  txt(scr, `GRAFIKA: ${game.profile.longLabel}`, tx, 77, C.YELLOW, { align: 'center' });
+  txt(scr, 'A1200  ·  RTG  ·  TRYB ZGODNOŚCI OCS', tx, 87, C.STEEL, { align: 'center' });
 
   // --- menu ---
-  scr.rect(94, 104, 132, 64, C.SHADOW);
-  scr.frame(93, 103, 134, 66, C.SLATE);
-  scr.frame(95, 105, 130, 62, C.OUTLINE);
-  menuList(game, 100, 109, 120, 13, 2);
+  scr.rect(90, 100, 140, 77, C.SHADOW);
+  scr.frame(89, 99, 142, 79, C.SLATE);
+  scr.frame(91, 101, 138, 75, C.OUTLINE);
+  menuList(game, 97, 106, 126, 12, 2);
 
   // --- stopka ---
-  scr.rect(52, 174, 216, 13, C.SHADOW);
-  scr.frame(51, 173, 218, 15, C.SLATE_DARK);
-  txt(scr, 'STRZAŁKI + ENTER  /  KURSOR', tx, 176, C.BONE, { align: 'center' });
-  txt(scr, `ZIARNO: ${game.lastSeedLabel}`, 5, 191, C.BONE);
-  txt(scr, 'V0.1  /  PROTOTYP', 315, 191, C.BONE, { align: 'right' });
+  scr.rect(46, 177, 228, 11, C.SHADOW);
+  scr.frame(45, 176, 230, 13, C.SLATE_DARK);
+  txt(scr, 'STRZAŁKI + ENTER  ·  G ZMIENIA TRYB', tx, 179, C.BONE, { align: 'center' });
+  scr.rect(287, 190, 30, 8, C.SHADOW);
+  txt(scr, 'V0.2', 315, 191, C.SLATE, { align: 'right' });
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +229,7 @@ export function drawHUD(game) {
   txt(scr, 'H POMOC', 5, 191, C.SLATE);
   txt(scr, 'M MAPA', 66, 191, C.SLATE);
   txt(scr, 'E AKCJA', 126, 191, C.SLATE);
+  txt(scr, game.profile.label, 196, 191, C.GOLD);
   txt(scr, 'SPACJA ATAK', 314, 191, C.SLATE, { align: 'right' });
 
   // --- uszkodzenia / niskie HP (czerwona ramka bez szumu) ---
@@ -254,13 +253,14 @@ export function drawHUD(game) {
 export function drawPause(game) {
   const scr = game.screen;
   scr.shade(0, 0, scr.w, scr.h, C.OUTLINE, 0);
-  scr.panel(84, 14, 152, 172, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
-  drawText(scr, 'PAUZA', 160, 24, C.YELLOW, { scale: 2, align: 'center', shadow: C.OUTLINE });
-  txt(scr, `DZIEŃ ${game.dayNumber()}  ${game.clockString()}`, 160, 44, C.BONE, { align: 'center' });
-  menuList(game, 98, 58, 124, 13, 3);
-  txt(scr, `ZABÓJ: ${game.stats.kills}`, 94, 148, C.BONE);
-  txt(scr, `ZIARNO: ${game.lastSeedLabel}`, 226, 148, C.SLATE, { align: 'right' });
-  txt(scr, 'ESC WRÓĆ DO GRY', 160, 170, C.STEEL, { align: 'center' });
+  scr.panel(80, 8, 160, 182, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
+  drawText(scr, 'PAUZA', 160, 15, C.YELLOW, { scale: 2, align: 'center', shadow: C.OUTLINE });
+  txt(scr, `DZIEŃ ${game.dayNumber()}  ${game.clockString()}`, 160, 34, C.BONE, { align: 'center' });
+  txt(scr, game.profile.longLabel, 160, 44, C.STEEL, { align: 'center' });
+  menuList(game, 92, 57, 136, 12, 2);
+  txt(scr, `ZABÓJ: ${game.stats.kills}`, 88, 152, C.BONE);
+  txt(scr, `ZIARNO: ${game.lastSeedLabel}`, 232, 152, C.SLATE, { align: 'right' });
+  txt(scr, 'ESC WRÓĆ DO GRY  ·  G GRAFIKA', 160, 172, C.STEEL, { align: 'center' });
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ export function drawHelp(game) {
   scr.shade(0, 0, scr.w, scr.h, C.OUTLINE, 0);
   scr.panel(6, 4, 308, 192, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
   txt(scr, 'STEROWANIE', 160, 10, C.YELLOW, { scale: 2, align: 'center' });
-  scr.hline(14, 306, 28, C.SLATE_DARK);
+  scr.hline(14, 306, 30, C.SLATE_DARK);
 
   const left = [
     ['RUCH', 'W A S D / STRZAŁKI'],
@@ -284,6 +284,7 @@ export function drawHelp(game) {
     ['LATARKA', 'F'],
     ['MAPA', 'M'],
     ['PAUZA', 'ESC'],
+    ['GRAFIKA', 'G'],
   ];
   left.forEach(([a, b], i) => {
     const y = 34 + i * 10;
@@ -295,38 +296,37 @@ export function drawHelp(game) {
     txt(scr, a, 164, y, C.BONE);
     txt(scr, b, 164 + 52, y, C.YELLOW);
   });
-  scr.hline(14, 306, 88, C.SLATE_DARK);
+  scr.hline(14, 306, 96, C.SLATE_DARK);
 
-  txt(scr, 'PRZETRWANIE', 14, 94, C.YELLOW);
-  const tips = [
+  txt(scr, 'PRZETRWANIE', 14, 98, C.YELLOW);
+  const tl = [
     'E OTWIERA DRZWI, MEBLE I PODNOSI ŁUPY.',
     'OKNO ZABIJESZ: MŁOTEK, DESKA, 2 GWOŹDZIE.',
     'HAŁAS ŚCIĄGA ZOMBIE. PISTOLET NAJGŁOŚNIEJSZY.',
     'ŚPIJ W ŁÓŻKU, GDY NIE MA ZOMBIE W POBLIŻU.',
     'JEDZ, PIJ, NOŚ BANDAŻE. TABLETKI LECZĄ.',
   ];
-  tips.forEach((line, i) => txt(scr, fit(line, 292), 14, 104 + i * 9, C.BONE));
+  tl.forEach((line, i) => txt(scr, fit(line, 292), 14, 106 + i * 9, C.BONE));
 
   scr.hline(14, 306, 152, C.SLATE_DARK);
-  txt(scr, 'CEL: PRZETRWAJ DWIE DOBY (DO 08:00 DNIA 3)', 14, 158, C.YELLOW);
-  txt(scr, `ZIARNO: ${game.lastSeedLabel}`, 14, 168, C.STEEL);
-  txt(scr, 'TO SAMO ZIARNO = TO SAMO MIASTO', 14, 177, C.SLATE);
-  button(game, 128, 184, 64, 10, 'POWRÓT', 'back', false);
+  txt(scr, 'CEL: PRZETRWAJ DWIE DOBY (DO 08:00 DNIA 3)', 14, 156, C.YELLOW);
+  txt(scr, `ZIARNO: ${game.lastSeedLabel} · TO SAMO ZIARNO = TO SAMO MIASTO`, 14, 166, C.SLATE);
+  button(game, 128, 179, 64, 11, 'POWRÓT', 'back', false);
 }
 
 // ---------------------------------------------------------------------------
 export function drawAbout(game) {
   const scr = game.screen;
+  const prof = game.profile;
   scr.shade(0, 0, scr.w, scr.h, C.OUTLINE, 0);
   scr.panel(8, 6, 304, 188, { fill: C.SHADOW, border: C.SLATE, inner: C.OUTLINE });
-  txt(scr, 'O PROJEKCIE', 160, 13, C.YELLOW, { scale: 2, align: 'center' });
+  txt(scr, 'O PROJEKCIE', 160, 12, C.YELLOW, { scale: 2, align: 'center' });
   const paragraphs = [
-    'AMBOID to fanowski hołd dla PROJECT ZOMBOID przeniesiony w realia AMIGI. Izometryczne miasteczko, zombie, głód i deski na oknach.',
-    'Cała grafika powstaje proceduralnie w palecie 32 kolorów. Rozdzielczość to 320x200. Dźwięki są syntezowane na żywo.',
-    'Wersja docelowa: AMIGA 500/1200 — 68000, OCS/ECS, 512 KB RAM, jedna dyskietka.',
-    'Projekt fanowski, nieoficjalny. Zrobiony dla zabawy i nauki.',
+    'AMBOID to fanowski hołd dla PROJECT ZOMBOID w realiach AMIGI: izometryczne miasteczko, zombie, głód i deski na oknach.',
+    'Cel sprzętowy: rozbudowana A1200 (68030 + fast RAM, AGA 64 kolory) albo system z kartą RTG (chunky 8-bit, światło RGB).',
+    'Jeden tileset, trzy profile: OCS 32, AGA 64, RTG. Grafika i dźwięk są proceduralne. Projekt nieoficjalny.',
   ];
-  let y = 33;
+  let y = 30;
   for (const para of paragraphs) {
     const lines = wrapText(para, 284);
     for (const line of lines) {
@@ -335,12 +335,16 @@ export function drawAbout(game) {
     }
     y += 3;
   }
-  txt(scr, 'PALETA 32 KOLORY', 160, 141, C.SLATE, { align: 'center' });
-  for (let i = 0; i < 32; i++) {
-    scr.rect(64 + i * 6, 150, 5, 8, i);
-    scr.frame(64 + i * 6, 150, 5, 8, C.OUTLINE);
+  txt(scr, `PALETA ${prof.colors} KOLORÓW · ${prof.bitplanes} BITPLANÓW · ${prof.id.toUpperCase()}`, 160, 126, C.SLATE, { align: 'center' });
+  const sw = prof.colors > 32 ? 4 : 6;
+  const total = prof.colors * sw;
+  for (let i = 0; i < prof.colors; i++) {
+    scr.rect(160 - total / 2 + i * sw, 135, sw - 1, 9, i);
+    scr.frame(160 - total / 2 + i * sw, 135, sw - 1, 9, C.OUTLINE);
   }
-  button(game, 130, 170, 60, 13, 'POWRÓT', 'back', false);
+  txt(scr, prof.lighting ? 'RTG: ŚWIATŁO RGB LICZONE PER PIKSEL' : 'BEZ ŚWIATŁA RGB — TABELE PRZYGASZENIA', 160, 149, C.STEEL, { align: 'center' });
+  txt(scr, 'G PRZEŁĄCZA TRYB GRAFIKI', 160, 157, C.SLATE, { align: 'center' });
+  button(game, 130, 168, 60, 13, 'POWRÓT', 'back', false);
 }
 
 // ---------------------------------------------------------------------------

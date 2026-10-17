@@ -1,13 +1,14 @@
 # AMBOID — dokument projektowy (GDD)
 
-Wersja 0.1 · prototyp HTML5 · cel docelowy: Amiga 500 / 1200
+Wersja 0.2 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
 
 ---
 
 ## 1. Wizja
 
-**Jedno zdanie:** Project Zomboid w izometrii, na Amidze, w 32 kolorach, w mieście
-tak małym, żeby można je było objąć wzrokiem — i tak niebezpiecznym, że to nie pomaga.
+**Jedno zdanie:** Project Zomboid w izometrii, na Amidze, w 64 kolorach AGA
+(albo z prawdziwym światłem na karcie RTG), w mieście tak małym, żeby można je
+było objąć wzrokiem — i tak niebezpiecznym, że to nie pomaga.
 
 **Filary:**
 
@@ -15,10 +16,10 @@ tak małym, żeby można je było objąć wzrokiem — i tak niebezpiecznym, że
    czy okno (trzeba desek)? Strzelić czy walczyć kijem?
 2. **Świat nie czeka.** Czas płynie, głód i pragnienie spadają, zombie wędrują.
    Nie ma „pauzy taktycznej" — pauza to tylko ekran.
-3. **Czytelność zamiast realizmu.** 32 kolory wymuszają skróty: kontur, dither,
-   ikony. Gracz ma wiedzieć, co widzi, w jednej klatce.
+3. **Czytelność zamiast realizmu.** Ograniczona paleta wymusza skróty: kontur,
+   dither, ikony. Gracz ma wiedzieć, co widzi, w jednej klatce.
 4. **Amiga to nie ograniczenie, to styl.** Ograniczenia sprzętowe są częścią
-   doświadczenia: bieg zamiast animacji 24 fps, dither zamiast gradientów.
+   doświadczenia: bieg zamiast animacji 24 fps, paleta zamiast milionów kolorów.
 
 **Non-goals (świadomie poza zakresem):** wielopiętrowe budynki, pojazdy którymi się
 jeździ, crafting drzewek technologicznych, NPC, multiplayer, otwarty świat większy
@@ -221,8 +222,11 @@ Ziarno pozwala powtórzyć dokładnie to samo miasteczko.
 
 ## 11. Oprawa
 
-- **Paleta:** 32 kolory stałe — 9 odcieni „ziemi" (zieleń, brąz), 5 metali,
-  4 kolory krwi, 4 skóry, 4 neutralne, żółty UI, niebieski woda.
+- **Paleta:** 32 kolory bazowe + 32 półtony AGA (64 w trybie AGA/RTG) — 9 odcieni
+  „ziemi" (zieleń, brąz), 5 metali, 4 kolory krwi, 4 skóry, 4 neutralne,
+  żółty UI, niebieski woda. OCS mapuje półtony na bazę.
+- **Tryby grafiki:** OCS 32, AGA 64 (tablice przygaszenia) i RTG (chunky 8-bit,
+  światło RGB: ciepłe latarnie, zimna noc, latarka).
 - **Font:** 5×7 px, ręcznie rysowany, z polskimi diakrytykami (glif bazowy +
   kropka/kreska/ogonek). Skala 1× i 2×.
 - **Ciemność:** 4 tablice przemapowania indeksów (dzień / zmierzch / noc / pamięć) +
@@ -253,5 +257,6 @@ deski, mapa, ekrany końca, eksport IFF/AMB.
 **v0.2** — więcej typów budynków (kościół, szkoła, bar), pojazd jako schronienie,
 alarm samochodowy, więcej broni, ręczne poprawki atlasów w DPaint.
 
-**v1.0 (Amiga)** — patrz `docs/AMIGA.md`: silnik 68000 w C, dane `.amb` na
-dyskietce, 25 fps w 320×200/32 kolory na A1200, tryb oszczędny na A500.
+**v1.0 (Amiga)** — patrz `docs/AMIGA.md`: silnik 68030 w C, dwa backendy
+(planar AGA i chunky RTG), dane `.amb` na HDD/CF, 25–50 fps w 320×200/64 kolory
+na rozbudowanej A1200 oraz tryb zgodności OCS 32 dla A500.

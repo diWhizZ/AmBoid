@@ -15,7 +15,7 @@ const outDir = path.resolve('docs/screens');
 fs.mkdirSync(outDir, { recursive: true });
 
 function save(name, scale = 2) {
-  screen.syncRGBA();
+  game.present();
   const src = screen.rgba();
   const w = VIEW_W * scale;
   const h = VIEW_H * scale;
@@ -40,13 +40,15 @@ game.render();
 save('01-tytul.png');
 
 // 1b. O projekcie
+game.setProfile('aga', true);
 game.mode = 'about';
 game.render();
 save('08-o-projekcie.png');
 game.mode = 'menu';
 
-// 2. Miasteczko za dnia + zombie
+// 2. Miasteczko za dnia + zombie (cel: AGA 64)
 game.startGame(0x5eed1);
+game.setProfile('aga', true);
 game.player.x = 25; game.player.y = 8;
 game.player.vx = 25; game.player.vy = 8;
 game.camera.follow(25, 8);
@@ -59,6 +61,12 @@ game.time = 10 * 60 + 20;
 game.render();
 save('02-miasteczko.png');
 
+// 2b. Ten sam kadr w trybie zgodności OCS (32 kolory)
+game.setProfile('ocs', true);
+game.render();
+save('09-ocs-dzien.png');
+game.setProfile('aga', true);
+
 // 3. Walka
 game.inventory.push({ id: 'bat', count: 1, dur: 42 });
 game.selected = game.inventory.length - 1;
@@ -68,7 +76,8 @@ game.tryAttack();
 game.render();
 save('03-walka.png');
 
-// 4. Noc z latarką
+// 4. Noc z latarką — tryb RTG, prawdziwe światło RGB
+game.setProfile('rtg', true);
 game.time = 23 * 60;
 game.weather = 'clear';
 game.player.flashlightOn = true;
@@ -77,7 +86,8 @@ game.update(0.05);
 game.render();
 save('04-noc.png');
 
-// 5. Deszcz
+// 5. Deszcz (AGA)
+game.setProfile('aga', true);
 game.time = 12 * 60 + 40;
 game.player.flashlightOn = false;
 game.weather = 'rain';

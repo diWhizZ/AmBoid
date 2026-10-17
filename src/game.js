@@ -6,6 +6,7 @@ import { drawText, textWidth, wrapText, LINE_H } from './font.js';
 import { C } from './palette.js';
 import { ITEMS, CONTAINER_NAMES } from './items.js';
 import { makeRng, hash2 } from './rng.js';
+import { getProfile, nextProfile } from './profiles.js';
 import { renderWorld, renderEffects } from './scene.js';
 import {
   drawHUD,
@@ -69,6 +70,15 @@ export class Game {
     this.hordeNight = -1;
     this.victoryShown = false;
     this.menuCam = new Camera(WORLD_W, WORLD_H);
+    let savedProfile = null;
+    try {
+      if (typeof localStorage !== 'undefined') savedProfile = localStorage.getItem('amboid.gfx');
+    } catch (e) {
+      /* brak dostępu do localStorage */
+    }
+    this.profileId = getProfile(savedProfile || 'aga').id;
+    this.profile = getProfile(this.profileId);
+    if (this.screen) this.screen.setProfile(this.profile);
     this.createMenuWorld();
   }
 
@@ -86,6 +96,89 @@ export class Game {
       return a[0] >>> 0;
     }
     return (Math.random() * 0xffffffff) >>> 0;
+  }
+
+  setProfile(id, silent = false) {
+    const profile = getProfile(id);
+    this.profileId = profile.id;
+    this.profile = profile;
+    if (this.screen) this.screen.setProfile(profile);
+    this.updateFOV(true);
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('amboid.gfx', profile.id);
+    } catch (e) {
+      /* brak dostępu do localStorage */
+    }
+    if (!silent && (this.mode === 'playing' || this.mode === 'paused')) {
+      this.msg(`GRAFIKA: ${profile.longLabel}`, C.YELLOW);
+    }
+    return profile;
+  }
+
+  cycleProfile() {
+    const profile = this.setProfile(nextProfile(this.profileId));
+    this.audio.play('click');
+    return profile;
+  }
+
+  // Mnożnik jasności dla trybu RTG (prawdziwe światło zamiast tablic palety).
+  ambientFactor() {
+    const amb = this.ambientDim();
+    let f = amb === 0 ? 1 : amb === 1 ? 0.78 : 0.46;
+    if (this.weather === 'overcast') f -= 0.05;
+    if (this.weather === 'rain') f -= 0.09;
+    return Math.max(0.3, Math.min(1, f));
+  }
+
+  // Barwa światła otoczenia: noc chłodzi obraz w stronę granatu.
+  ambientTint() {
+    const amb = this.ambientDim();
+    if (amb === 0) return [1, 1, 1];
+    if (amb === 1) return [0.92, 0.94, 1.04];
+    return [0.74, 0.82, 1.12];
+  }
+
+  // Lista świateł RTG w pikselach ekranu (0..320 / 0..200).
+  getLights() {
+    if (!this.profile || !this.profile.lighting || !this.world || !this.player) return [];
+    const lights = [];
+    const amb = this.ambientDim();
+    const cam = this.camera;
+    const bounds = cam.visibleBounds(1);
+    for (const lamp of this.world.lamps) {
+      if (lamp.x < bounds.x0 - 5 || lamp.x > bounds.x1 + 5) continue;
+      if (lamp.y < bounds.y0 - 5 || lamp.y > bounds.y1 + 5) continue;
+      const [sx, sy] = cam.toScreen(lamp.x, lamp.y);
+      const flicker = 0.94 + Math.sin(this.t * 5.1 + lamp.x * 1.7) * 0.06;
+      const strength = amb > 0 ? 0.48 : 0.14;
+      lights.push({
+        sx: sx + 16,
+        sy: sy - 4,
+        r: 3.2 * 32,
+        i: strength * flicker,
+        color: [255, 168, 82],
+      });
+    }
+    const p = this.player;
+    const [px, py] = cam.toScreen(p.vx, p.vy);
+    if (p.flashlightOn) {
+      const radius = (this.currentFovRadius || 9) * 20;
+      lights.push({
+        sx: px + 16,
+        sy: py - 4,
+        r: radius,
+        i: 0.5,
+        color: [255, 240, 198],
+      });
+    } else if (amb > 0) {
+      lights.push({ sx: px + 16, sy: py - 4, r: 2.2 * 32, i: 0.22, color: [170, 190, 255] });
+    }
+    for (const e of this.effects) {
+      if (e.type === 'shot' && e.t < 0.1) {
+        lights.push({ sx: px + 16, sy: py + 8, r: 5 * 32, i: 0.7, color: [255, 230, 170] });
+      }
+    }
+    return lights;
   }
 
   startGame(seed) {
@@ -235,6 +328,7 @@ export class Game {
   // Poziom przyciemnienia kafla: 0 = jasno, 4 = czerń. Pamięć mapy = 3.
   tileDim(x, y, vis) {
     if (!vis) return 3; // pamięć mapy
+    if (this.profile && this.profile.lighting) return 0; // RTG: światło liczone w RGB
     const amb = this.ambientDim();
     if (amb === 0) {
       // miękka winieta na skraju zasięgu wzroku
@@ -1489,12 +1583,14 @@ export class Game {
           { label: 'NOWA GRA', action: 'new' },
           { label: 'JAK GRAĆ', action: 'help' },
           { label: 'O PROJEKCIE', action: 'about' },
+          { label: `GRAFIKA: ${this.profile.label}`, action: 'graphics' },
           { label: 'PEŁNY EKRAN', action: 'fullscreen' },
         ];
       case 'paused':
         return [
           { label: 'WRÓĆ DO GRY', action: 'resume' },
           { label: 'STEROWANIE', action: 'pausedHelp' },
+          { label: `GRAFIKA: ${this.profile.label}`, action: 'graphics' },
           { label: 'NOWA GRA', action: 'restart' },
           { label: 'MENU GŁÓWNE', action: 'menu' },
           { label: `DŹWIĘK: ${this.audio.muted ? 'WYŁ' : 'WŁ'}`, action: 'mute' },
@@ -1559,6 +1655,9 @@ export class Game {
         this.msg(muted ? 'DŹWIĘK WYŁĄCZONY' : 'DŹWIĘK WŁĄCZONY', C.BONE);
         break;
       }
+      case 'graphics':
+        this.cycleProfile();
+        break;
       case 'fullscreen':
         this.toggleFullscreen();
         break;
@@ -1613,6 +1712,9 @@ export class Game {
           this.helpReturn = 'paused';
           this.mode = 'help';
           return true;
+        case 'KeyG':
+          this.cycleProfile();
+          return true;
         case 'Escape':
           this.mode = 'paused';
           this.menuIndex = 0;
@@ -1645,6 +1747,10 @@ export class Game {
         this.menuAction('back');
         return true;
       }
+      if (code === 'KeyG') {
+        this.cycleProfile();
+        return true;
+      }
       return false;
     }
 
@@ -1671,6 +1777,10 @@ export class Game {
       if (code === 'Enter' || code === 'Space') {
         const items = this.menuItems();
         if (items[this.menuIndex]) this.menuAction(items[this.menuIndex].action);
+        return true;
+      }
+      if (code === 'KeyG') {
+        this.cycleProfile();
         return true;
       }
       return false;
@@ -1718,6 +1828,19 @@ export class Game {
   }
 
   // -------------------------------------------------------------------------
+  // Prezentacja klatki: w RTG liczymy prawdziwe światło RGB, w OCS/AGA
+  // wystarczy podmiana indeksów na paletę.
+  present() {
+    const scr = this.screen;
+    const litMode = this.mode === 'playing' || this.mode === 'paused' || this.mode === 'dead';
+    if (scr.profile && scr.profile.lighting && litMode && this.world) {
+      scr.rgbaLit(this.getLights(), this.ambientFactor(), this.ambientTint());
+    } else {
+      scr.syncRGBA();
+    }
+    return scr;
+  }
+
   render() {
     this.buttons = [];
     if (this.mode === 'menu' || this.mode === 'about' || (this.mode === 'help' && this.helpBg === 'menu')) {

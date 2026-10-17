@@ -1,7 +1,7 @@
 // Renderer: bufor indeksów palety -> RGBA dla canvasu.
 // Rozdzielczość logiczna 320x200 — klasyczny tryb lowres Amigi (PAL/NTSC).
 
-import { PALETTE, C, TRANSPARENT, paletteToUint32, DIM_TABLES, DIM_DITHER } from './palette.js';
+import { PALETTE, C, TRANSPARENT, DIM_TABLES, DIM_DITHER, hexToRgb } from './palette.js';
 
 export const VIEW_W = 320;
 export const VIEW_H = 200;
@@ -29,7 +29,38 @@ export class Screen {
     this.h = h;
     this.data = new Uint8Array(w * h);
     this.u32 = new Uint32Array(w * h);
-    this.pal32 = paletteToUint32(PALETTE);
+    this.profileId = 'ocs';
+    this.setProfile({
+      id: 'ocs',
+      palette: PALETTE,
+      fallback: null,
+      lighting: false,
+    });
+  }
+
+  // Ustawia aktywną paletę. fallback mapuje indeksy spoza palety (np. 64-kolorowe
+  // odcienie AGA w trybie 32 kolorów) na najbliższy kolor bazowy.
+  setProfile(profile) {
+    this.profileId = profile.id;
+    this.profile = profile;
+    const palette = profile.palette || PALETTE;
+    const fallback = profile.fallback || null;
+    const n = palette.length;
+    const pal256 = new Uint32Array(256);
+    const rgb = new Uint8Array(256 * 3);
+    for (let i = 0; i < 256; i++) {
+      let source = i;
+      if (i >= n) source = fallback && fallback[i] != null ? fallback[i] : 0;
+      if (source === TRANSPARENT) source = 0;
+      const hex = palette[source] || '#000000';
+      const [r, g, b] = hexToRgb(hex);
+      pal256[i] = (255 << 24) | (b << 16) | (g << 8) | r;
+      rgb[i * 3] = r;
+      rgb[i * 3 + 1] = g;
+      rgb[i * 3 + 2] = b;
+    }
+    this.pal256 = pal256;
+    this.rgbPal = rgb;
   }
 
   clear(color = C.VOID) {
@@ -163,13 +194,65 @@ export class Screen {
   syncRGBA() {
     const d = this.data;
     const u = this.u32;
-    const p = this.pal32;
+    const p = this.pal256;
     for (let i = 0; i < d.length; i++) u[i] = p[d[i]];
     return u;
   }
 
+  /**
+   * Tryb RTG: zamiast tablic przygaszenia liczymy prawdziwe światło RGB.
+   * lights: [{sx, sy, r, i, color:[r,g,b]}] w pikselach ekranu.
+   * ambient: 0..1 (mnożnik barwy bazowej).
+   * Na Amidze z kartą RTG (8-bit chunky) to pętla po pikselach; na 68030
+   * liczymy to kaflami z gotowych tablic, na 68060/Vampire — per piksel.
+   */
+  rgbaLit(lights, ambient = 1, tint = null) {
+    const d = this.data;
+    const p = this.rgbPal;
+    const u = this.u32;
+    const w = this.w;
+    const h = this.h;
+    const L = [];
+    for (const l of lights) {
+      L.push({ x: l.sx, y: l.sy, r: l.r, r2: l.r * l.r, i: l.i, cr: l.color[0], cg: l.color[1], cb: l.color[2] });
+    }
+    for (let y = 0; y < h; y++) {
+      const dy2base = y * 2;
+      for (let x = 0; x < w; x++) {
+        const idx = d[y * w + x];
+        const bi = idx * 3;
+        let r = p[bi] * ambient;
+        let g = p[bi + 1] * ambient;
+        let b = p[bi + 2] * ambient;
+        if (tint) {
+          r *= tint[0];
+          g *= tint[1];
+          b *= tint[2];
+        }
+        for (let k = 0; k < L.length; k++) {
+          const l = L[k];
+          const dx = x - l.x;
+          const dy = (y - l.y) * 2;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= l.r2) continue;
+          let f = 1 - d2 / l.r2;
+          f = f * f * f * l.i;
+          r += l.cr * f;
+          g += l.cg * f;
+          b += l.cb * f;
+        }
+        if (r > 255) r = 255;
+        if (g > 255) g = 255;
+        if (b > 255) b = 255;
+        u[y * w + x] = (255 << 24) | ((b | 0) << 16) | ((g | 0) << 8) | (r | 0);
+      }
+    }
+    return u;
+  }
+
   rgba() {
-    return new Uint8ClampedArray(this.syncRGBA().buffer);
+    // Zwracamy aktualny bufor prezentacji (po syncRGBA albo po rgbaLit).
+    return new Uint8ClampedArray(this.u32.buffer);
   }
 }
 

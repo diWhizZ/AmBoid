@@ -1,7 +1,7 @@
 // Cała grafika jest generowana proceduralnie w indeksach 32-kolorowej palety.
 // Zero zewnętrznych assetów — tak jakbyśmy rysowali tilesety w Deluxe Paint.
 
-import { C, TRANSPARENT } from './palette.js';
+import { C, X, TRANSPARENT } from './palette.js';
 import { PixelBuffer } from './pixel.js';
 import { makeRng, hash2 } from './rng.js';
 
@@ -15,6 +15,23 @@ const DIAMOND = [
 ];
 
 export const WALL_H = 20;
+
+// Ramy tonalne materiałów (od światła do cienia). W trybie OCS półtony AGA
+// wracają do kolorów bazowych, więc obraz jest identyczny; w AGA dają płynne
+// przejścia. Gradient na kaflu liczymy raz i wybieramy ton z rampy.
+const RAMPS = {
+  grass: [X.GRASS_LIT, C.GRASS_LIGHT, X.GRASS_MID, C.GRASS, C.GRASS_DARK],
+  dirt: [C.WOOD_LIGHT, X.DIRT_LIT, C.GOLD, X.DIRT_MID, C.WOOD],
+  asphalt: [X.ASPHALT_HI, C.ASPHALT_LIGHT, X.ASPHALT_MID, C.ASPHALT, C.ASPHALT_DARK],
+  sidewalk: [X.CONCRETE_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.ASPHALT],
+  wood: [X.WOOD_WARM, C.WOOD_LIGHT, X.WOOD_MID, C.WOOD, C.WOOD_DARK],
+  tile: [X.CONCRETE_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.STEEL],
+  carpet: [X.BLOOD_FRESH, C.BLOOD, X.BLOOD_DRY, C.BLOOD_DARK, C.WOOD_DARK],
+  water: [X.WATER_HI, C.STEEL, X.WATER_MID, C.BLUE, X.WATER_DEEP],
+  concrete: [X.CONCRETE_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.ASPHALT_DARK],
+  gravel: [X.ASPHALT_HI, C.CONCRETE, X.CONCRETE_MID, C.CONCRETE_DARK, C.ASPHALT_DARK],
+};
+
 
 function diamondMask() {
   const pb = new PixelBuffer(TILE_W, TILE_H);
@@ -46,28 +63,19 @@ function makeGround(kind, variant) {
   const pb = new PixelBuffer(TILE_W, TILE_H);
   const mask = diamondMask();
 
-  const base = {
-    grass: [C.GRASS, C.GRASS_DARK, C.GRASS_LIGHT],
-    dirt: [C.GOLD, C.WOOD, C.WOOD_LIGHT],
-    asphalt: [C.ASPHALT_DARK, C.ASPHALT, C.ASPHALT_LIGHT],
-    sidewalk: [C.CONCRETE_DARK, C.CONCRETE, C.ASPHALT_LIGHT],
-    wood: [C.WOOD_DARK, C.WOOD, C.WOOD_LIGHT],
-    tile: [C.CONCRETE, C.CONCRETE_DARK, C.STEEL],
-    carpet: [C.BLOOD_DARK, C.BLOOD, C.WOOD_DARK],
-    water: [C.BLUE, C.SLATE_DARK, C.STEEL],
-    concrete: [C.CONCRETE_DARK, C.ASPHALT, C.CONCRETE],
-    gravel: [C.CONCRETE_DARK, C.ASPHALT_LIGHT, C.CONCRETE],
-  }[kind] || [C.GRASS, C.GRASS_DARK, C.GRASS_LIGHT];
+  const ramp = RAMPS[kind] || RAMPS.grass;
 
-  // baza z delikatnym szumem
+  // gradient + szum: 64-kolorowa AGA dostaje pięć tonów na materiał,
+  // OCS widzi z tego trzy kolory bazowe (identyczny układ plam).
   for (let y = 0; y < TILE_H; y++) {
     for (let x = 0; x < TILE_W; x++) {
       if (mask.get(x, y) === TRANSPARENT) continue;
       const n = hash2(x + variant * 37, y + variant * 91, kind.length);
-      let c = base[0];
-      if (n > 0.93) c = base[1];
-      else if (n > 0.88) c = base[2];
-      pb.set(x, y, c);
+      const gx = (x - y * 2 + TILE_H) / (TILE_W + TILE_H);
+      let tone = Math.floor(gx * 3.4 + (n - 0.5) * 1.5 + 0.35);
+      if (tone < 0) tone = 0;
+      else if (tone > 4) tone = 4;
+      pb.set(x, y, ramp[tone]);
     }
   }
 
@@ -77,9 +85,9 @@ function makeGround(kind, variant) {
       const x = rng.int(6, 25);
       const y = rng.int(3, 12);
       if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, C.GRASS_LIGHT);
+      pb.set(x, y, rng.chance(0.3) ? X.GRASS_LIT : C.GRASS_LIGHT);
       pb.set(x, y - 1, C.GRASS_LIGHT);
-      if (rng.chance(0.5)) pb.set(x + 1, y, C.GRASS_DARK);
+      if (rng.chance(0.5)) pb.set(x + 1, y, rng.chance(0.25) ? X.GRASS_DEEP : C.GRASS_DARK);
     }
     if (variant === 2) {
       const x = rng.int(8, 22);
@@ -119,7 +127,7 @@ function makeGround(kind, variant) {
       const x = rng.int(3, 28);
       const y = rng.int(2, 13);
       if (mask.get(x, y) === TRANSPARENT) continue;
-      pb.set(x, y, rng.chance(0.5) ? C.ASPHALT : C.CONCRETE);
+      pb.set(x, y, rng.chance(0.33) ? X.CONCRETE_HI : rng.chance(0.5) ? C.ASPHALT : C.CONCRETE);
     }
     // krawężnik po jednej stronie (delikatnie)
     for (let x = 2; x < 30; x++) {
@@ -131,7 +139,7 @@ function makeGround(kind, variant) {
     for (let y = 1; y < TILE_H; y += 3) {
       for (let x = 0; x < TILE_W; x++) {
         if (mask.get(x, y) !== TRANSPARENT) pb.set(x, y, C.WOOD_DARK);
-        if (mask.get(x, y + 1) !== TRANSPARENT && hash2(x, y, 7) > 0.4) pb.set(x, y + 1, C.WOOD_LIGHT);
+        if (mask.get(x, y + 1) !== TRANSPARENT && hash2(x, y, 7) > 0.4) pb.set(x, y + 1, hash2(x, y, 9) > 0.7 ? X.WOOD_WARM : C.WOOD_LIGHT);
       }
     }
     for (let i = 0; i < 3; i++) {
@@ -161,7 +169,7 @@ function makeGround(kind, variant) {
       for (let x = 0; x < TILE_W; x++) {
         if (mask.get(x, y) === TRANSPARENT) continue;
         const w = Math.sin((x + variant * 6) * 0.5 + y * 1.2) + Math.sin(y * 0.9 + variant);
-        pb.set(x, y, w > 1.1 ? C.STEEL : w > 0.2 ? C.BLUE : C.SLATE_DARK);
+        pb.set(x, y, w > 1.25 ? X.WATER_HI : w > 1.1 ? C.STEEL : w > 0.2 ? C.BLUE : w > -0.6 ? C.SLATE_DARK : X.WATER_DEEP);
       }
     }
   } else if (kind === 'gravel') {
@@ -216,7 +224,7 @@ function makeWall(material, feature = null) {
   for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 32; x++) {
       if (pb.get(x, y) === TRANSPARENT) continue;
-      if (hash2(x, y, 5) > 0.94) pb.set(x, y, style.capHi);
+      if (hash2(x, y, 5) > 0.9) pb.set(x, y, style.capHi);
     }
   }
 
@@ -242,26 +250,29 @@ function makeWall(material, feature = null) {
 
   // tekstura cegieł / desek / betonu
   if (material === 'brick') {
-    const brick = (x0, x1, base, light) => {
+    const brick = (x0, x1, base, light, hi) => {
       for (let y = 9; y < 8 + H; y++) {
         for (let x = x0; x < x1; x++) {
           if (pb.get(x, y) === TRANSPARENT) continue;
           const row = Math.floor((y - 9) / 5);
           const off = row % 2 === 0 ? 0 : 4;
-          if ((y - 9) % 5 === 0) pb.set(x, y, style.mortar);
+          const by = (y - 9) % 5;
+          if (by === 0) pb.set(x, y, style.mortar);
           else if ((x + off - x0) % 8 === 0) pb.set(x, y, style.mortar);
+          else if (by === 1 && hash2(x, y, 19) > 0.55) pb.set(x, y, hi);
+          else if (by === 4 && hash2(x, y, 23) > 0.6) pb.set(x, y, C.BLOOD_DARK);
           else if (hash2(x, y, 11) > 0.9) pb.set(x, y, light);
           else pb.set(x, y, base);
         }
       }
     };
-    brick(1, 16, C.BLOOD_DARK, C.BLOOD);
-    brick(17, 31, C.BLOOD, C.BLOOD_BRIGHT);
+    brick(1, 16, C.BLOOD_DARK, C.BLOOD, C.BLOOD);
+    brick(17, 31, C.BLOOD, C.BLOOD_BRIGHT, X.BLOOD_FRESH);
   } else if (material === 'wood') {
     for (let y = 10; y < 8 + H; y += 6) {
       for (let x = 0; x < 32; x++) {
         if (pb.get(x, y) !== TRANSPARENT) pb.set(x, y, C.OUTLINE);
-        if (pb.get(x, y + 1) !== TRANSPARENT && hash2(x, y, 4) > 0.55) pb.set(x, y + 1, style.light);
+        if (pb.get(x, y + 1) !== TRANSPARENT && hash2(x, y, 4) > 0.55) pb.set(x, y + 1, hash2(x, y, 6) > 0.65 ? X.WOOD_WARM : style.light);
       }
     }
     for (let i = 0; i < 4; i++) {
@@ -273,7 +284,7 @@ function makeWall(material, feature = null) {
     for (let y = 9; y < 8 + H; y++) {
       for (let x = 0; x < 32; x++) {
         if (pb.get(x, y) === TRANSPARENT) continue;
-        if (hash2(x, y, 21) > 0.93) pb.set(x, y, x > 16 ? C.BONE : C.ASPHALT_DARK);
+        if (hash2(x, y, 21) > 0.93) pb.set(x, y, x > 16 ? X.CONCRETE_HI : X.CONCRETE_MID);
         if (y === 15 || y === 25) pb.set(x, y, C.ASPHALT_DARK);
       }
     }
@@ -447,8 +458,17 @@ function makeTree(variant = 0, dead = false) {
       if (pb.get(x, y) !== TRANSPARENT) {
         const dx = x - cx;
         const dy = y - cy;
-        if (dx * dx + dy * dy < rx * rx * 0.7) pb.set(x, y, rng.chance(0.6) ? C.GRASS_LIGHT : C.GRASS);
+        if (dx * dx + dy * dy < rx * rx * 0.7) {
+          const r = rng.next();
+          pb.set(x, y, r > 0.78 ? X.GRASS_LIT : r > 0.4 ? C.GRASS_LIGHT : C.GRASS);
+        }
       }
+    }
+    for (let i = 0; i < 7; i++) {
+      const [cx, cy, rx, ry] = blobs[rng.int(0, blobs.length - 1)];
+      const x = cx + rng.int(-rx + 2, rx - 2);
+      const y = cy + rng.int(-ry + 2, ry - 2);
+      if (pb.get(x, y) !== TRANSPARENT) pb.set(x, y, rng.chance(0.5) ? X.DIRT_LIT : C.GOLD);
     }
     // owoce / kwiaty
     if (variant === 2) {
@@ -564,9 +584,16 @@ function makeCar(bodyColor, wreck = false) {
     ],
     C.SLATE,
   );
+  pb.set(33, 11, X.GLASS_HI);
+  pb.set(34, 11, X.GLASS_HI);
   // reflektor
   pb.set(5, 16, C.YELLOW);
   pb.set(6, 17, C.YELLOW);
+  if (bodyColor === C.METAL) {
+    pb.set(20, 14, X.METAL_HI);
+    pb.set(21, 14, X.STEEL_HI);
+    pb.set(31, 12, X.METAL_HI);
+  }
   // rdza / brud
   if (bodyColor !== C.METAL) {
     pb.set(12, 20, C.WOOD_DARK);
@@ -1044,6 +1071,7 @@ function makeCorpse(variant = 0) {
   const skin = C.ZOMBIE_SKIN;
   // krew
   pb.ellipse(14, 10, 12, 4, C.BLOOD_DARK);
+  pb.ellipse(13, 10, 8, 2, X.BLOOD_DRY);
   pb.fillPoly(
     [
       [2, 9],
@@ -1350,7 +1378,7 @@ export function buildArt() {
         for (let xx = -r; xx <= r; xx++) {
           if (xx * xx + yy * yy > r * r) continue;
           if (rng.chance(0.25)) continue;
-          pb.set(x + xx, y + yy, rng.chance(0.3) ? C.BLOOD : C.BLOOD_DARK);
+          pb.set(x + xx, y + yy, rng.chance(0.22) ? X.BLOOD_FRESH : rng.chance(0.35) ? C.BLOOD : rng.chance(0.3) ? X.BLOOD_DRY : C.BLOOD_DARK);
         }
       }
     }

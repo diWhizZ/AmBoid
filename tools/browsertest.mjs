@@ -119,8 +119,8 @@ for (const cb of listeners['win:resize'] || []) cb();
 console.log('canvas css size:', canvas.style.width, canvas.style.height);
 
 // sprawdź, czy obraz zawiera tylko kolory z palety
-import { PALETTE, hexToRgb } from '../src/palette.js';
-const allowed = new Set(PALETTE.map((h) => hexToRgb(h).join(',')));
+import { PALETTE, PALETTE_EXT, hexToRgb } from '../src/palette.js';
+const allowed = new Set([...PALETTE, ...PALETTE_EXT].map((h) => hexToRgb(h).join(',')));
 let bad = 0;
 const data = lastImage.data;
 for (let i = 0; i < data.length; i += 4) {
@@ -128,5 +128,6 @@ for (let i = 0; i < data.length; i += 4) {
   if (!allowed.has(key)) bad++;
 }
 console.log('pixels outside palette:', bad, '/', data.length / 4);
+if (bad > 0) { console.error('BROWSER-STUB FAIL: kolory spoza palety 64'); process.exitCode = 1; }
 console.log('total putImageData:', putCount);
 console.log('BROWSER-STUB TEST OK');

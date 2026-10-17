@@ -367,7 +367,7 @@ section('Interfejs i ekrany');
   }
   g.toMenu();
   g.render();
-  check('menu ma przyciski', g.buttons.length === 4);
+  check('menu ma przyciski', g.buttons.length === 5);
   check('menu rysuje podgląd miasta', g.screen.data.some((v) => v !== 0));
 }
 {
@@ -394,6 +394,82 @@ section('Interfejs i ekrany');
   check('M zamyka mapę', g.mode === 'playing');
 }
 
+section('Tryby graficzne OCS / AGA / RTG');
+{
+  const { PALETTE, PALETTE_EXT, EXT_TO_BASE, DIM_TABLES } = await import('../src/palette.js');
+  const { PROFILES, frameBytes } = await import('../src/profiles.js');
+  check('paleta bazowa ma 32 kolory', PALETTE.length === 32);
+  check('paleta AGA ma 64 kolory', PALETTE_EXT.length === 64);
+  check('pierwsze 32 kolory AGA to paleta bazowa', PALETTE.slice(0, 32).every((c, i) => PALETTE_EXT[i] === c));
+  check('mapa kolorów rozszerzonych jest kompletna', EXT_TO_BASE.length === 64 && EXT_TO_BASE.every((v) => v < 32));
+
+  const g = newGame();
+  check('domyślny profil to AGA', g.profileId === 'aga' && g.screen.pal256.length === 256);
+  g.mode = 'playing';
+  g.render();
+  let extended = 0;
+  for (const v of g.screen.data) if (v >= 32 && v < 64) extended++;
+  check('AGA faktycznie używa kolorów 32-63', extended > 500, `pikseli: ${extended}`);
+  check('AGA nie mapuje kolorów na bazę', g.screen.profile.fallback === null);
+
+  g.setProfile('ocs');
+  check('OCS włącza tryb 32 kolorów', g.screen.profile.colors === 32 && g.screen.profile.bitplanes === 5);
+  check('OCS mapuje odcienie AGA na bazę', g.screen.pal256[32] === g.screen.pal256[EXT_TO_BASE[32]]);
+
+  g.setProfile('rtg');
+  check('RTG włącza światło RGB', g.screen.profile.lighting === true);
+  g.time = 23 * 60;
+  g.player.flashlightOn = true;
+  g.updateFOV(true);
+  const lights = g.getLights();
+  check('RTG ma światło gracza i latarnie', lights.length >= 1 && lights.some((l) => l.r > 100));
+  check('RTG przygasza światło otoczenia nocą', g.ambientFactor() < 0.6 && g.ambientFactor() >= 0.2);
+  g.mode = 'playing';
+  g.render();
+  g.present();
+  const before = g.screen.u32[Math.floor((g.player.vy * 0 + 100) * 320 + 160)];
+  check('RTG prezentuje klatkę bez błędu', Number.isFinite(before) && before !== 0);
+
+  // ten sam obraz w nocy: OCS przygasza indeksy, RTG zostawia indeksy i liczy światło
+  g.setProfile('ocs');
+  g.render();
+  g.present();
+  g.player.flashlightOn = false;
+  const ocsDim = g.tileDim(15, 4, true);
+  g.setProfile('rtg');
+  g.render();
+  const rtgDim = g.tileDim(15, 3, true);
+  check('OCS/AGA przygaszają indeksy, RTG nie', ocsDim > 0 && rtgDim === 0, `ocs=${ocsDim} rtg=${rtgDim}`);
+
+  // mapowanie DIM na indeksy rozszerzone
+  const t = DIM_TABLES[2];
+  check('tablice przygaszenia pokrywają 64 kolory', t[32] === t[EXT_TO_BASE[32]] && t[255] === 255);
+
+  // przełączanie klawiszem G
+  const beforeId = g.profileId;
+  g.keyDown('KeyG');
+  check('klawisz G zmienia profil graficzny', g.profileId !== beforeId);
+  g.mode = 'menu';
+  check('profil graficzny jest w menu', g.menuItems().some((it) => /GRAFIKA/.test(it.label)));
+  g.mode = 'playing';
+  const prof = g.cycleProfile();
+  check('cykl profili zwraca OCS/AGA/RTG', ['ocs', 'aga', 'rtg'].includes(prof.id));
+  check('profil ma etykietę i opis pamięci', !!PROFILES.aga.label && PROFILES.rtg.bitplanes === 8);
+  check('budżet klatki: AGA 48 KB, RTG 64 KB', frameBytes(PROFILES.aga) === 48000 && frameBytes(PROFILES.rtg) === 64000);
+
+  // prezentacja RTG naprawdę podmienia bufor wyjściowy
+  g.setProfile('rtg');
+  g.mode = 'playing';
+  g.time = 23 * 60;
+  g.player.flashlightOn = true;
+  g.render();
+  g.present();
+  const lit = g.screen.u32[100 * 320 + 160];
+  g.screen.syncRGBA();
+  const plain = g.screen.u32[100 * 320 + 160];
+  check('RTG prezentuje oświetlony bufor', lit !== plain, `${lit} vs ${plain}`);
+}
+
 section('Dane i eksport');
 {
   const g = newGame();
@@ -401,7 +477,7 @@ section('Dane i eksport');
   check('każda ikona przedmiotu istnieje', Object.keys(ITEMS).every((id) => !!art.icons[ITEMS[id].icon]));
   check('każdy kafel podłogi ma 3 warianty', ['grass', 'dirt', 'asphalt', 'sidewalk', 'wood', 'tile', 'carpet', 'water', 'concrete', 'gravel'].every((k) => art.tiles[k].length === 3));
   check('każdy materiał ściany ma 5 wariantów', ['brick', 'concrete', 'wood'].every((m) => Object.keys(art.walls[m]).length === 5));
-  check('paleta ma dokładnie 32 kolory', (await import('../src/palette.js')).PALETTE.length === 32);
+  check('paleta eksportowa ma dokładnie 32 kolory', (await import('../src/palette.js')).PALETTE.length === 32);
 }
 
 console.log(`\n${passed} OK, ${failed} FAIL`);

@@ -1,4 +1,6 @@
-// Minimalny zapis IFF ILBM (5 bitplanów, 32 kolory) + paleta.
+// Minimalny zapis IFF ILBM + paleta.
+//   domyślnie: 5 bitplanów, 32 kolory (OCS/ECS)
+//   opcje: bits: 6 + palette: PALETTE_EXT → 64 kolory AGA
 // Dzięki temu grafika z prototypu jest gotowa do otwarcia w Deluxe Paint
 // i do wczytania przez silnik na Amidze.
 
@@ -13,14 +15,21 @@ function chunk(id, data) {
   return Buffer.concat([head, padded]);
 }
 
-function makeCMAP() {
-  const buf = Buffer.alloc(32 * 3);
-  for (let i = 0; i < 32; i++) {
-    const [r, g, b] = hexToRgb(PALETTE[i]);
-    // 4 bity na kanał, jak w rejestrach COLORxx Amigi
-    buf[i * 3 + 0] = (r >> 4) * 17;
-    buf[i * 3 + 1] = (g >> 4) * 17;
-    buf[i * 3 + 2] = (b >> 4) * 17;
+function makeCMAP(palette = PALETTE, deep = false) {
+  const buf = Buffer.alloc(palette.length * 3);
+  for (let i = 0; i < palette.length; i++) {
+    const [r, g, b] = hexToRgb(palette[i]);
+    if (deep) {
+      // AGA: 8 bitów na kanał (24-bitowa paleta)
+      buf[i * 3 + 0] = r;
+      buf[i * 3 + 1] = g;
+      buf[i * 3 + 2] = b;
+    } else {
+      // OCS/ECS: 4 bity na kanał, jak w rejestrach COLORxx
+      buf[i * 3 + 0] = (r >> 4) * 17;
+      buf[i * 3 + 1] = (g >> 4) * 17;
+      buf[i * 3 + 2] = (b >> 4) * 17;
+    }
   }
   return buf;
 }
@@ -65,7 +74,7 @@ export function writeILBM(path, pixels, width, height, opts = {}) {
   const content = Buffer.concat([
     Buffer.from('ILBM', 'ascii'),
     chunk('BMHD', bmhd),
-    chunk('CMAP', makeCMAP()),
+    chunk('CMAP', makeCMAP(opts.palette || PALETTE, bits > 5)),
     chunk('BODY', body),
   ]);
   const head = Buffer.alloc(8);
@@ -76,11 +85,11 @@ export function writeILBM(path, pixels, width, height, opts = {}) {
   return file.length;
 }
 
-// Zapis surowej palety (96 bajtów, 8 bitów na kanał) — do importu w edytorach.
-export function writePalette(path) {
-  const buf = Buffer.alloc(32 * 3);
-  for (let i = 0; i < 32; i++) {
-    const [r, g, b] = hexToRgb(PALETTE[i]);
+// Zapis surowej palety (3 B na kolor, 8 bitów na kanał) — do importu w edytorach.
+export function writePalette(path, palette = PALETTE) {
+  const buf = Buffer.alloc(palette.length * 3);
+  for (let i = 0; i < palette.length; i++) {
+    const [r, g, b] = hexToRgb(palette[i]);
     buf[i * 3] = r;
     buf[i * 3 + 1] = g;
     buf[i * 3 + 2] = b;

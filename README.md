@@ -6,8 +6,9 @@
 
 <p align="center">
   Izometryczny survival zombie inspirowany <b>Project Zomboid</b>,<br>
-  zaprojektowany tak, jakby miał powstać na <b>Amigę 500/1200</b>.<br>
-  <b>32 kolory. 320×200. 68000. Jedna dyskietka.</b>
+  zaprojektowany tak, jakby miał powstać na <b>rozbudowaną Amigę 1200 (AGA)</b><br>
+  albo system z <b>kartą RTG</b>.<br>
+  <b>64 kolory. Światło RGB. 320×200. 68030.</b>
 </p>
 
 <p align="center">
@@ -22,15 +23,16 @@
 
 AMBOID to fanowski hołd dla Project Zomboid przeniesiony w realia Amigi. Nie jest to
 port — to wariacja na temat: małe miasteczko widziane w izometrii, głód, pragnienie,
-ciemność, zombie przyciągane hałasem i deski na oknach. Wszystko ciasno upakowane
-w limitach sprzętu z 1987 roku.
+ciemność, zombie przyciągane hałasem i deski na oknach. Wszystko upakowane
+w limitach Amigi — ale bez ascezy A500: 64 kolory AGA i prawdziwe światło RGB
+na karcie RTG, z trybem zgodności OCS jako opcją.
 
 Gra jest w pełni grywalna: eksplorujesz, przeszukujesz meble, walczysz, zabijasz okna
 deskami, śpisz w łóżkach i próbujesz przetrwać **dwie doby**.
 
 <p align="center">
-  <img src="docs/screens/02-miasteczko.png" width="49%" alt="Miasteczko w dzień">
-  <img src="docs/screens/04-noc.png" width="49%" alt="Noc z latarką">
+  <img src="docs/screens/02-miasteczko.png" width="49%" alt="Miasteczko w dzień — AGA 64">
+  <img src="docs/screens/04-noc.png" width="49%" alt="Noc z latarką — RTG, światło RGB">
 </p>
 <p align="center">
   <img src="docs/screens/03-walka.png" width="49%" alt="Walka kijem bejsbolowym">
@@ -49,7 +51,8 @@ npm start
 Możesz też otworzyć `index.html` przez dowolny serwer statyczny. Gra nie wymaga
 budowania ani instalacji pakietów — to czysty HTML5 + ES modules.
 
-Opcjonalnie własne miasteczko: `http://localhost:8080/?seed=ABC123`.
+Opcjonalnie własne miasteczko i tryb grafiki:
+`http://localhost:8080/?seed=ABC123&gfx=rtg` (`ocs`, `aga` lub `rtg`).
 
 ### Sterowanie
 
@@ -62,6 +65,7 @@ Opcjonalnie własne miasteczko: `http://localhost:8080/?seed=ABC123`.
 | `Q` | użyj wybranego przedmiotu |
 | `1`–`0` | wybór slotu |
 | `F` / `M` / `H` | latarka / mapa / pomoc |
+| `G` | przełącz tryb grafiki: OCS 32 → AGA 64 → RTG |
 | `Esc` | pauza |
 
 ## Co jest w grze
@@ -81,19 +85,38 @@ Opcjonalnie własne miasteczko: `http://localhost:8080/?seed=ABC123`.
 - **Cel** — przetrwać do początku trzeciego dnia (licznik w HUD), a potem graj dalej.
 
 Cała grafika i dźwięk powstają **proceduralnie** — w repozytorium nie ma ani jednego
-pliku PNG używanego przez grę ani pliku audio. Paleta jest zamknięta na 32 kolory.
+pliku PNG używanego przez grę ani pliku audio. Paleta bazowa ma 32 kolory, a AGA
+dokłada 32 półtony; OCS mapuje je z powrotem na bazę.
+
+## Trzy tryby grafiki
+
+Ten sam tileset i ta sama logika działają w trzech profilach. Przełączasz je
+klawiszem **G** (albo w menu: `GRAFIKA`) — wybór zapisuje się w przeglądarce.
+
+| Profil | Kolory | Bitplany | Światło | Zastosowanie |
+| --- | --- | --- | --- | --- |
+| **OCS 32** | 32 | 5 | tablice przygaszenia | A500, CD32, tryb zgodności |
+| **AGA 64** | 64 | 6 | tablice przygaszenia | A1200 030+, domyślny |
+| **RTG RGB** | 64 | chunky 8-bit | **prawdziwe światło RGB** | karta RTG (P96/CGX) |
+
+<p align="center">
+  <img src="docs/screens/02-miasteczko.png" width="32%" alt="AGA 64 — dzień">
+  <img src="docs/screens/09-ocs-dzien.png" width="32%" alt="OCS 32 — ten sam kadr">
+  <img src="docs/screens/04-noc.png" width="32%" alt="RTG — noc, światło RGB">
+</p>
+<p align="center"><i>AGA 64 · OCS 32 (ten sam kadr) · RTG w nocy</i></p>
 
 ## Jak to jest zrobione po amigowemu
 
 | Element | Amiga | Ten prototyp |
 | --- | --- | --- |
 | Rozdzielczość | 320×200 lowres | 320×200, skalowanie nearest |
-| Paleta | 5 bitplanów = 32 kolory | stała tablica 32 kolorów |
+| Paleta | 6 bitplanów = 64 kolory (AGA) | 32 kolory bazowe + 32 półtony |
 | Izometria | 32×16 kafli | te same proporcje 2:1 |
-| Cień / mgła | dither Bayera 4×4 | matryca Bayera w rendererze |
-| Światło | pre-shaded paleta | 4 tablice przemapowania indeksów + dither |
+| Cień / mgła | pre-shaded paleta | 4 tablice przemapowania (64 wpisy) |
+| Światło | lightmapa / blitter | RTG: `rgbaLit` — ambient + 8 świateł RGB |
 | Dźwięk | Paula, 4 kanały | WebAudio, fale kwadratowe i szum |
-| Grafika | DPaint | atlas IFF ILBM (5 bitplanów) w `docs/amiga/` |
+| Grafika | DPaint / Personal Paint | IFF ILBM 5 i 6 bitplanów w `docs/amiga/` |
 
 Najważniejsza decyzja: **wszystko rysowane jest w indeksach palety**, a nie w RGB.
 Bufor `Uint8Array` 320×200 → konwersja na RGBA dopiero przy wystawieniu na canvas.
@@ -102,13 +125,14 @@ sprawdza, że na ekranie jest dokładnie 0 pikseli spoza palety.
 
 ## Dokumentacja
 
-- **[docs/AMIGA.md](docs/AMIGA.md)** — pełny plan przeniesienia na A500/A1200:
-  tryby graficzne, budżet cykli 68000, DMA, blitter, struktura pamięci,
-  format plików, plan pracy i lista cięć.
+- **[docs/AMIGA.md](docs/AMIGA.md)** — plan przeniesienia na A1200 AGA / RTG:
+  trzy profile, budżet 68030, blitter vs chunky, paleta 64 kolorów,
+  światło RGB, struktura pamięci, format plików i lista cięć.
 - **[docs/GDD.md](docs/GDD.md)** — projekt gry: pętla rozgrywki, ekonomia,
   AI zombie, tabela przedmiotów, balans, UI.
-- **[docs/amiga/](docs/amiga/)** — wyeksportowane assety: atlasy IFF ILBM
-  (do otwarcia w Deluxe Paint), paleta `.pal`, wygenerowane miasto `.amb`.
+- **[docs/amiga/](docs/amiga/)** — atlasy IFF ILBM do Deluxe Paint / Personal
+  Paint: `docs/amiga/` (32 kolory, 5 bitplanów) i `docs/amiga/aga/`
+  (64 kolory, 6 bitplanów), palety `.pal`, miasto `.amb`.
 
 ## Narzędzia
 
@@ -128,8 +152,9 @@ klatki gry do PNG przez `pngjs`.
 
 ```
 index.html            ekran + delikatny CRT
-src/palette.js        paleta 32 kolorów (jedyne źródło prawdy)
-src/render.js         bufor indeksów, kamera izometryczna, dither, sprite'y
+src/palette.js        paleta 32 + 32 półtony AGA (jedyne źródło prawdy)
+src/profiles.js       profile OCS / AGA / RTG
+src/render.js         bufor indeksów, kamera, światło RGB, sprite'y
 src/art.js            proceduralna grafika: kafle, ściany, postacie, ikony
 src/pixel.js          mały PixelBuffer do rysowania sprite'ów
 src/font.js           font 5×7 z polskimi znakami
@@ -144,7 +169,7 @@ tools/                serwer, testy, eksport IFF/AMB, zrzuty ekranu
 ## Ograniczenia i uczciwe zastrzeżenia
 
 - To **prototyp przeglądarkowy**, nie build na Amigę. Prawdziwy port wymaga
-  implementacji w C/assemblerze 68000 — plan i budżet są w `docs/AMIGA.md`.
+  implementacji w C/assemblerze 68030 — plan i budżet są w `docs/AMIGA.md`.
 - Grafika jest celowo surowa i ograniczona paletą; to nie jest pixel art z DPaint,
   tylko generatory pikseli. Atlasy IFF można dopieścić ręcznie.
 - Projekt nie zawiera żadnych assetów Project Zomboid — inspiracja dotyczy
