@@ -42,9 +42,15 @@ deskami, śpisz w łóżkach i próbujesz przetrwać **dwie doby**.
 ## Wersja v0.2.4 — widok daleki
 
 **Pobierz gotowy projekt (bez Gita):**
+[**ZIP źródeł v0.2.4 — dostępny teraz**](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.4.zip) ·
 [Release v0.2.4](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.4) ·
-[AmBoid-0.2.4.zip](https://github.com/diWhizZ/AmBoid/releases/download/v0.2.4/AmBoid-0.2.4.zip) ·
 [aktualny main.zip](https://github.com/diWhizZ/AmBoid/archive/refs/heads/main.zip).
+
+**Status publikacji:** PR #2 scalony, tag i Release v0.2.4 opublikowane.
+Osobny asset `AmBoid-0.2.4.zip` czeka na wysyłkę: sandbox nie ma dostępu do
+`uploads.github.com`, a GitHub App nie ma uprawnienia `workflows`.
+ZIP tagu powyżej i „Source code (zip)” na Release są dostępne niezależnie od
+tego ograniczenia. [Szczegóły i gotowy workflow](docs/PUBLIKACJA.md).
 
 Changelog:
 - domyślny **widok daleki 0,75×**: świat 427×267, ekran nadal **320×200**;
