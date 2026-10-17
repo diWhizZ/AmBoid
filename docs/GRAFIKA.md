@@ -1,6 +1,6 @@
 # AMBOID — plan poprawy strony graficznej
 
-Stan na **v0.2.3** (grafika bez zmian względem 0.2.2). Punkt wyjścia: 320×200, izometria 2:1, kafle 32×16, ściany
+Stan na **v0.2.4** (widok daleki; proceduralny tileset z 0.2.3). Punkt wyjścia: 320×200, izometria 2:1, kafle 32×16, ściany
 20 px, wszystko proceduralne, palety 32 (OCS) / 64 (AGA, RTG).
 
 Dokument odpowiada na pytanie „co możemy zrobić, żeby gra wyglądała lepiej” —
@@ -8,8 +8,10 @@ w kolejności od rzeczy o największym efekcie do najbardziej kosztownych.
 
 ---
 
-## 1. Co już jest (stan 0.2.2/0.2.3)
+## 1. Co już jest (stan v0.2.4)
 
+- **widok daleki 0,75×** (świat 427×267 → 320×200, MAJORITY 2×2) i bliski 1×,
+- **V / `?view=far|close`**, HUD i kursor bez pomniejszania, ostre trasy po skalowaniu,
 - trzy profile grafiki: OCS 32, AGA 64 i RTG z prawdziwym światłem RGB,
 - pięć tonów na materiał (AGA/RTG) i mapowanie półtonów do bazy w OCS,
 - trzy warianty każdej podłogi, pięć wariantów ściany, dither Bayera,
@@ -127,6 +129,19 @@ w wersji natywnej.
 ---
 
 ## 7. Kolejność wdrożenia
+
+**Bieżący priorytet — etap 4 (Cannon Fodder):** czytelne ikony ekwipunku i łupów
+z jednej 16-kolorowej podpalety, bez gradientów; animacje 2–4-klatkowe,
+mirror zamiast niezależnego rysowania obu boków; krew, łuski, dym, błysk,
+ślady stóp z limitem pamięci. Portret i pasek stanu zaprojektowane w 320×200.
+Postacie/rekwizyty mają spójną perspektywę diagonal-down, ale grunt pozostaje
+32×16 i ściana 20 px. CF nie wymusza zmiany siatki świata ani walki na RTS.
+Filozofia: **70% Project Zomboid / 30% Cannon Fodder**.
+
+Najpierw publikacja v0.2.4 na main i Release; następnie etap 4, potem etap 5 — NPC.
+Poniższy starszy backlog pozostaje propozycją, nie powodem do zwiększania
+animacji ponad 4 klatki lub przebudowywania kafli.
+
 
 1. **A6–A7** — domknięcie tanich efektów (1 dzień).
 2. **B2 + B3** — autotile i cienie; największa zmiana w odbiorze miasta (2 dni).

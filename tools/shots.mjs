@@ -60,6 +60,11 @@ for (const [x, y, v] of [[27, 7, 0], [23, 9, 1], [26, 11, 2], [28, 8, 3]]) {
 game.time = 10 * 60 + 20;
 game.render();
 save('02-miasteczko.png');
+save('11-widok-daleki.png');
+game.setViewMode('close', true);
+game.render();
+save('12-widok-bliski.png');
+game.setViewMode('far', true);
 
 // 2b. Ten sam kadr w trybie zgodności OCS (32 kolory)
 game.setProfile('ocs', true);
@@ -92,7 +97,8 @@ for (let y = 0; y < 40 && !mouseTarget; y++) {
     if (!t.wall || t.wall.feature !== 'door' || t.wall.open) continue;
     const path = game.findPath(x, y, { adjacent: true });
     if (!path || path.length < 2 || path.length > 7) continue;
-    const [sx, sy] = game.camera.toScreen(x, y);
+    const [wx, wy] = game.camera.toScreen(x, y);
+    const sx = (wx + 16) * game.zoom, sy = (wy + 8) * game.zoom;
     if (sx < 20 || sx > 280 || sy < 50 || sy > 135) continue;
     mouseTarget = { x, y, int: true };
     break;
@@ -104,7 +110,8 @@ if (!mouseTarget) {
       if (!game.world.isWalkable(x, y) || game.interactionAt(x, y)) continue;
       const path = game.findPath(x, y, {});
       if (!path || path.length < 3 || path.length > 7) continue;
-      const [sx, sy] = game.camera.toScreen(x, y);
+      const [wx, wy] = game.camera.toScreen(x, y);
+      const sx = (wx + 16) * game.zoom, sy = (wy + 8) * game.zoom;
       if (sx < 20 || sx > 280 || sy < 50 || sy > 135) continue;
       mouseTarget = { x, y, int: false };
       break;
@@ -113,9 +120,9 @@ if (!mouseTarget) {
 }
 if (mouseTarget) {
   const [mx, my] = game.camera.toScreen(mouseTarget.x, mouseTarget.y);
-  game.pointerMove(mx + 16, my + 8);
+  game.pointerMove((mx + 16) * game.zoom, (my + 8) * game.zoom);
   game.updateHover();
-  game.issueMoveOrder(mx + 16, my + 8);
+  game.issueMoveOrder((mx + 16) * game.zoom, (my + 8) * game.zoom);
   game.render();
   save('10-mysz.png');
 }

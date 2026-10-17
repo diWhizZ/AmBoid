@@ -1,11 +1,11 @@
 // Logika gry AMBOID.
 
 import { World, WORLD_W, WORLD_H } from './world.js';
-import { Camera, VIEW_W, VIEW_H, TILE_W, TILE_H } from './render.js';
+import { Screen, Camera, VIEW_W, VIEW_H, TILE_W, TILE_H } from './render.js';
 import { drawText, textWidth, wrapText, LINE_H } from './font.js';
 import { C } from './palette.js';
 import { ITEMS, CONTAINER_NAMES } from './items.js';
-import { makeRng, hash2 } from './rng.js';
+import { makeRng } from './rng.js';
 import { getProfile, nextProfile } from './profiles.js';
 import { renderWorld, renderEffects, renderOrders } from './scene.js';
 import {
@@ -176,6 +176,13 @@ export class Game {
     this._holdT = 0;
     this._lastHoldX = null;
     this._lastHoldY = null;
+    let savedView = null;
+    try {
+      if (typeof localStorage !== 'undefined') savedView = localStorage.getItem('amboid.view');
+    } catch (e) {
+      /* brak dostępu do localStorage */
+    }
+    this.setViewMode(savedView === 'close' ? 'close' : 'far', true);
     this.createMenuWorld();
   }
 
@@ -200,6 +207,7 @@ export class Game {
     this.profileId = profile.id;
     this.profile = profile;
     if (this.screen) this.screen.setProfile(profile);
+    if (this.worldScreen) this.worldScreen.setProfile(profile);
     this.updateFOV(true);
     try {
       if (typeof localStorage !== 'undefined') localStorage.setItem('amboid.gfx', profile.id);
@@ -216,6 +224,47 @@ export class Game {
     const profile = this.setProfile(nextProfile(this.profileId));
     this.audio.play('click');
     return profile;
+  }
+
+  // Ekran i HUD zostają w 320×200. Oddalamy tylko świat: 427×267 → 320×200.
+  setViewMode(mode, silent = false) {
+    if (mode !== 'far' && mode !== 'close') return this.viewMode;
+    this.viewMode = mode;
+    this.zoom = mode === 'far' ? 0.75 : 1;
+    this.viewW = Math.ceil(VIEW_W / this.zoom);
+    this.viewH = Math.ceil(VIEW_H / this.zoom);
+    this.worldScreen = mode === 'far' ? new Screen(this.viewW, this.viewH) : this.screen;
+    this.worldScreen.setProfile(this.profile);
+    for (const cam of [this.camera, this.menuCam]) {
+      if (!cam) continue;
+      cam.viewW = this.viewW;
+      cam.viewH = this.viewH;
+      cam.lookX = this.leadX / this.zoom;
+      cam.lookY = this.leadY / this.zoom;
+      cam.follow(cam.x, cam.y);
+    }
+    this.updateFOV(true);
+    this.updateHover();
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem('amboid.view', mode);
+    } catch (e) {
+      /* brak dostępu do localStorage */
+    }
+    if (!silent && (this.mode === 'playing' || this.mode === 'paused')) {
+      this.msg(mode === 'far' ? 'WIDOK DALEKI 0,75×' : 'WIDOK BLISKI 1×', C.YELLOW);
+    }
+    return mode;
+  }
+
+  toggleViewMode() {
+    this.setViewMode(this.viewMode === 'far' ? 'close' : 'far');
+    this.audio.play('click');
+    return this.viewMode;
+  }
+
+  // Wszystkie wejścia myszy: piksele HUD/canvas → piksele bufora świata.
+  worldPoint(x, y) {
+    return [x / this.zoom, y / this.zoom];
   }
 
   setControlScheme(id, silent = false) {
@@ -323,7 +372,7 @@ export class Game {
         lights.push({ sx: px + 16, sy: py + 8, r: 5 * 32, i: 0.7, color: [255, 230, 170] });
       }
     }
-    return lights;
+    return lights.map((l) => ({ ...l, sx: l.sx * this.zoom, sy: l.sy * this.zoom, r: l.r * this.zoom }));
   }
 
   startGame(seed) {
@@ -340,6 +389,8 @@ export class Game {
     this.rng = makeRng(this.seed ^ 0x9e3779b9);
     this.lastSeedLabel = this.world.seedLabel;
     this.camera = new Camera(WORLD_W, WORLD_H);
+    this.camera.viewW = this.viewW;
+    this.camera.viewH = this.viewH;
     this.player = {
       x: this.world.start.x,
       y: this.world.start.y,
@@ -476,7 +527,7 @@ export class Game {
     let r = amb === 0 ? 13 : amb === 1 ? 11 : 9;
     if (this.player.flashlightOn && amb > 0) r += 3;
     if (this.weather === 'rain') r -= 1;
-    return Math.max(5, r);
+    return Math.ceil(Math.max(5, r) / this.zoom);
   }
 
   updateFOV(force = false) {
@@ -491,20 +542,10 @@ export class Game {
 
   // Poziom przyciemnienia kafla: 0 = jasno, 4 = czerń. Pamięć mapy = 3.
   tileDim(x, y, vis) {
-    if (!vis) return 3; // pamięć mapy
     if (this.profile && this.profile.lighting) return 0; // RTG: światło liczone w RGB
     const amb = this.ambientDim();
-    if (amb === 0) {
-      // miękka winieta na skraju zasięgu wzroku
-      const r = this.currentFovRadius || 13;
-      const d = Math.hypot(x - this.player.x, y - this.player.y);
-      if (d > r - 2.5) {
-        const edge = (d - (r - 2.5)) / 2.5;
-        const h = hash2(x, y, 7);
-        if (h < edge) return h < edge * 0.5 ? 2 : 1;
-      }
-      return 0;
-    }
+    if (amb === 0) return 0; // dzień pozostaje jasny, także w pamięci mapy
+    if (!vis) return 3; // pamięć mapy nocą / o zmierzchu
     let boost = 0;
     const lamp = this.world.lampLight[this.world.idx(x, y)];
     if (lamp) boost = Math.max(boost, lamp);
@@ -1156,8 +1197,6 @@ export class Game {
   }
 
   // -------------------------------------------------------------------------
-  updateHover() {}
-
   findAttackTarget(range, requireLOS = true) {
     const p = this.player;
     let best = null;
@@ -1903,6 +1942,10 @@ export class Game {
       this.cycleProfile();
       return true;
     }
+    if (code === 'KeyV' && !repeat) {
+      this.toggleViewMode();
+      return true;
+    }
     if (code === 'KeyK' && !repeat) {
       this.toggleControlScheme();
       return true;
@@ -2129,7 +2172,7 @@ export class Game {
   mouseAttack(x, y) {
     const p = this.player;
     if (!p || !p.alive || this.mode !== 'playing') return;
-    const [tx, ty] = this.camera.tileAtScreen(x, y);
+    const [tx, ty] = this.camera.tileAtScreen(...this.worldPoint(x, y));
     let dir = null;
     if (Number.isFinite(tx) && Number.isFinite(ty) && (tx !== p.x || ty !== p.y)) {
       dir = this.facingFromDelta(tx - p.x, ty - p.y);
@@ -2180,7 +2223,7 @@ export class Game {
   issueMoveOrder(x, y) {
     if (this.mode !== 'playing' || !this.world || !this.player) return null;
     const p = this.player;
-    const [tx, ty] = this.camera.tileAtScreen(x, y);
+    const [tx, ty] = this.camera.tileAtScreen(...this.worldPoint(x, y));
     if (!this.world.inBounds(tx, ty)) return null;
 
     // 1) Zombie: podejdź i stań obok, ale NIE atakuj automatycznie.
@@ -2457,14 +2500,15 @@ export class Game {
       this.hover = null;
       return;
     }
-    const sx = this.mouse.x;
-    const sy = this.mouse.y;
+    const mx = this.mouse.x;
+    const my = this.mouse.y;
     const w = this.screen ? this.screen.w : VIEW_W;
     const h = this.screen ? this.screen.h : VIEW_H;
-    if (sx < 0 || sy < 0 || sx >= w || sy >= h || this.isOverHud(sx, sy)) {
+    if (mx < 0 || my < 0 || mx >= w || my >= h || this.isOverHud(mx, my)) {
       this.hover = null;
       return;
     }
+    const [sx, sy] = this.worldPoint(mx, my);
     const [x, y] = this.camera.tileAtScreen(sx, sy);
     if (!this.world.inBounds(x, y)) {
       this.hover = { sx, sy, x, y, state: 'none', label: '' };
@@ -2540,8 +2584,8 @@ export class Game {
     this.leadX += (tx - this.leadX) * k;
     this.leadY += (ty - this.leadY) * k;
     if (this.camera) {
-      this.camera.lookX = this.leadX;
-      this.camera.lookY = this.leadY;
+      this.camera.lookX = this.leadX / this.zoom;
+      this.camera.lookY = this.leadY / this.zoom;
     }
   }
 
@@ -2600,15 +2644,19 @@ export class Game {
       menu: true,
       noPlayer: true,
       dimAll: 1,
+      screen: this.worldScreen,
     });
+    if (this.zoom !== 1) this.screen.blitScaled(this.worldScreen, this.zoom);
     drawRain(this, true);
   }
 
   renderGameScene() {
     this.camera.follow(this.player.vx, this.player.vy);
-    renderWorld(this, this.world, this.camera, {});
-    renderOrders(this);
-    renderEffects(this);
+    renderWorld(this, this.world, this.camera, { screen: this.worldScreen });
+    renderEffects(this, { screen: this.worldScreen });
+    if (this.zoom !== 1) this.screen.blitScaled(this.worldScreen, this.zoom);
+    // Obrysy i kropki po zoom-out: nadal ostre, w pikselach 320×200.
+    renderOrders(this, { scale: this.zoom });
     if (this.weather === 'rain' && !this.playerInside()) drawRain(this);
   }
 }

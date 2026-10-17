@@ -105,7 +105,7 @@ export function drawTitle(game) {
   scr.frame(23, 176, 274, 13, C.SLATE_DARK);
   txt(scr, 'STRZAŁKI + ENTER · G GRAFIKA · K SCHEMAT', tx, 179, C.BONE, { align: 'center' });
   scr.rect(287, 190, 30, 8, C.SHADOW);
-  txt(scr, 'V0.2.3', 315, 191, C.SLATE, { align: 'right' });
+  txt(scr, 'V0.2.4', 315, 191, C.SLATE, { align: 'right' });
 }
 
 // Mały portret ocalałego w HUD — twarz zmienia się wraz ze stanem gracza.
@@ -364,12 +364,13 @@ export function drawHelp(game) {
   scr.hline(14, 306, 30, C.SLATE_DARK);
 
   const left = [
-    ['RUCH', 'W A S D / STRZAŁKI'],
+    ['RUCH', 'WASD / ↑↓←→'],
     ['BIEG', 'SHIFT'],
     ['SKRADANIE', 'CTRL'],
     ['ATAK', 'SPACJA / PPM'],
-    ['AKCJA / WEŹ', 'E'],
+    ['AKCJA/WEŹ', 'E'],
     ['SCHEMAT', 'K'],
+    ['WIDOK', 'V'],
   ];
   const right = [
     ['UŻYJ', 'Q'],
@@ -378,30 +379,30 @@ export function drawHelp(game) {
     ['MAPA', 'M'],
     ['PAUZA', 'ESC'],
     ['GRAFIKA', 'G'],
+    ['POMOC', 'H'],
   ];
   left.forEach(([a, b], i) => {
-    const y = 34 + i * 10;
+    const y = 33 + i * 9;
     txt(scr, a, 14, y, C.BONE);
     txt(scr, b, 14 + 66, y, C.YELLOW);
   });
   right.forEach(([a, b], i) => {
-    const y = 34 + i * 10;
+    const y = 33 + i * 9;
     txt(scr, a, 164, y, C.BONE);
     txt(scr, b, 164 + 52, y, C.YELLOW);
   });
-  scr.hline(14, 306, 92, C.SLATE_DARK);
-  txt(scr, 'MYSZ: LPM IDŹ · PPM ATAK · PRZYTRZYMAJ = PODĄŻAJ', 14, 96, C.YELLOW);
+  scr.hline(14, 306, 96, C.SLATE_DARK);
+  txt(scr, 'MYSZ: LPM IDŹ · PPM ATAK · PRZYTRZYMAJ = PODĄŻAJ', 14, 99, C.YELLOW);
 
-  scr.hline(14, 306, 105, C.SLATE_DARK);
-  txt(scr, 'PRZETRWANIE', 14, 108, C.YELLOW);
+  scr.hline(14, 306, 108, C.SLATE_DARK);
+  txt(scr, 'PRZETRWANIE', 14, 110, C.YELLOW);
   const tl = [
     'E OTWIERA DRZWI, MEBLE I PODNOSI ŁUPY.',
     'OKNO ZABIJESZ: MŁOTEK, DESKA, 2 GWOŹDZIE.',
     'HAŁAS ŚCIĄGA ZOMBIE. PISTOLET NAJGŁOŚNIEJSZY.',
-    'ŚPIJ W ŁÓŻKU, GDY NIE MA ZOMBIE W POBLIŻU.',
-    'JEDZ, PIJ, NOŚ BANDAŻE. TABLETKI LECZĄ.',
+    'JEDZ, PIJ, NOŚ BANDAŻE. ŚPIJ Z DALA OD ZOMBIE.',
   ];
-  tl.forEach((line, i) => txt(scr, fit(line, 292), 14, 116 + i * 8, C.BONE));
+  tl.forEach((line, i) => txt(scr, fit(line, 292), 14, 120 + i * 8, C.BONE));
 
   scr.hline(14, 306, 156, C.SLATE_DARK);
   txt(scr, 'CEL: PRZETRWAJ DWIE DOBY (DO 08:00 DNIA 3)', 14, 160, C.YELLOW);

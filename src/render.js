@@ -197,6 +197,37 @@ export class Screen {
     }
   }
 
+  // Zoom-out w przestrzeni INDEKSÓW, przed rgbaLit/syncRGBA. Cztery próbki
+  // 2×2 wybierają większość (MAJORITY), nigdy średnią RGB ani dominantę całego
+  // obszaru. Remis rozstrzyga pierwsza próbka — stabilnie i bez alokacji w pętli.
+  blitScaled(source, scale = this.w / source.w) {
+    const src = source.data;
+    const sw = source.w;
+    const sh = source.h;
+    const inv = 1 / scale;
+    this.clearUiMask();
+    for (let y = 0; y < this.h; y++) {
+      const sy = Math.min(sh - 1, Math.floor(y * inv));
+      const row = sy * sw;
+      const next = Math.min(sh - 1, sy + 1) * sw;
+      const dst = y * this.w;
+      for (let x = 0; x < this.w; x++) {
+        const sx = Math.min(sw - 1, Math.floor(x * inv));
+        const a = src[row + sx];
+        if (scale >= 1) {
+          this.data[dst + x] = a;
+          continue;
+        }
+        const sx1 = Math.min(sw - 1, sx + 1);
+        const b = src[row + sx1];
+        const c = src[next + sx];
+        const d = src[next + sx1];
+        this.data[dst + x] = a === b || a === c || a === d ? a
+          : b === c || b === d ? b : c === d ? c : a;
+      }
+    }
+  }
+
   // Sprite rysowany jako cień (wszystkie piksele jednym kolorem).
   blitShadow(sprite, x, y, color = C.OUTLINE) {
     this.blit(sprite, x, y, { flash: color });
@@ -317,8 +348,8 @@ export class Camera {
     this.y = y;
     const cx = isoX(x, y) + TILE_W / 2;
     const cy = isoY(x, y) + TILE_H / 2;
-    this.offX = Math.round(this.viewW / 2 - cx) + Math.round(this.lookX || 0);
-    this.offY = Math.round(this.viewH / 2 - cy) + Math.round(this.lookY || 0);
+    this.offX = Math.floor(this.viewW / 2) - Math.round(cx) + Math.round(this.lookX || 0);
+    this.offY = Math.floor(this.viewH / 2) - Math.round(cy) + Math.round(this.lookY || 0);
   }
 
   toScreen(x, y) {

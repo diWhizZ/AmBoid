@@ -23,6 +23,8 @@ try {
   const params = new URLSearchParams(window.location.search);
   const gfxParam = params.get('gfx');
   if (gfxParam && ['ocs', 'aga', 'rtg'].includes(gfxParam)) game.setProfile(gfxParam, true);
+  const viewParam = params.get('view');
+  if (viewParam === 'far' || viewParam === 'close') game.setViewMode(viewParam, true);
   const seedParam = params.get('seed');
   if (seedParam) {
     const parsed = parseInt(seedParam, 36);
@@ -33,7 +35,7 @@ try {
 }
 
 window.AMBOID = game;
-console.log('AMBOID v0.2.3 — mysz: LPM idź / PPM atak, grafika: G, sterowanie: K, pad: Gamepad API');
+console.log('AMBOID v0.2.4 — widok: V (far 0,75× / close 1×), mysz: LPM idź / PPM atak, grafika: G, sterowanie: K, pad: Gamepad API');
 
 const image = ctx.createImageData(VIEW_W, VIEW_H);
 const out32 = new Uint32Array(image.data.buffer);
