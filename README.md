@@ -39,12 +39,35 @@ deskami, śpisz w łóżkach i próbujesz przetrwać **dwie doby**.
   <img src="docs/screens/06-mapa.png" width="49%" alt="Mapa okolicy">
 </p>
 
+## Wersja v0.2.4 — widok daleki
+
+**Pobierz gotowy projekt (bez Gita):**
+[Release v0.2.4](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.4) ·
+[AmBoid-0.2.4.zip](https://github.com/diWhizZ/AmBoid/releases/download/v0.2.4/AmBoid-0.2.4.zip) ·
+[aktualny main.zip](https://github.com/diWhizZ/AmBoid/archive/refs/heads/main.zip).
+
+Changelog:
+- domyślny **widok daleki 0,75×**: świat 427×267, ekran nadal **320×200**;
+- **V** przełącza daleki / bliski; `?view=far|close` i zapis `amboid.view`;
+- skalowanie **indeksów palety, MAJORITY 2×2** — bez uśredniania RGB;
+- HUD, kursor i ostre kropki trasy nie są pomniejszane;
+- współrzędne myszy, FOV, światła RTG i wyprzedzenie kamery uwzględniają zoom;
+- pełne światło dnia także na zapamiętanych kaflach; całopikselowa kamera.
+
+<p align="center">
+  <img src="docs/screens/11-widok-daleki.png" width="49%" alt="Widok daleki 0,75× — domyślny">
+  <img src="docs/screens/12-widok-bliski.png" width="49%" alt="Ten sam kadr w widoku bliskim 1×">
+</p>
+
 ## Uruchomienie
 
 Potrzebujesz tylko Node.js (bez żadnych zależności produkcyjnych):
 
-```bash
-npm start
+Windows / PowerShell (również przy zablokowanym `npm.ps1`):
+
+```powershell
+cd D:\pobrane\zomboid\AmBoid-0.2.4
+node tools/serve.mjs
 # otwórz http://localhost:8080
 ```
 
@@ -52,7 +75,7 @@ Możesz też otworzyć `index.html` przez dowolny serwer statyczny. Gra nie wyma
 budowania ani instalacji pakietów — to czysty HTML5 + ES modules.
 
 Opcjonalnie własne miasteczko i tryb grafiki:
-`http://localhost:8080/?seed=ABC123&gfx=rtg` (`ocs`, `aga` lub `rtg`).
+`http://localhost:8080/?seed=ABC123&gfx=rtg&view=far` (`ocs`, `aga` lub `rtg`; `far` lub `close`).
 
 **Windows — pełna instrukcja krok po kroku:** [docs/WINDOWS.md](docs/WINDOWS.md)
 (Node.js, PowerShell, porty, testy, typowe problemy).
@@ -68,6 +91,7 @@ Opcjonalnie własne miasteczko i tryb grafiki:
 | `Q` | użyj wybranego przedmiotu |
 | `1`–`0` | wybór slotu |
 | `F` / `M` / `H` | latarka / mapa / pomoc |
+| `V` | widok daleki **0,75×** ↔ bliski **1×** |
 | `G` | przełącz tryb grafiki: OCS 32 → AGA 64 → RTG |
 | `K` | przełącz schemat ruchu: **EKRAN** ↔ **IZO** |
 | `Esc` | pauza |
@@ -175,7 +199,8 @@ klawiszem **G** (albo w menu: `GRAFIKA`) — wybór zapisuje się w przeglądarc
 | Grafika | DPaint / Personal Paint | IFF ILBM 5 i 6 bitplanów w `docs/amiga/` |
 
 Najważniejsza decyzja: **wszystko rysowane jest w indeksach palety**, a nie w RGB.
-Bufor `Uint8Array` 320×200 → konwersja na RGBA dopiero przy wystawieniu na canvas.
+Świat: `Uint8Array` 427×267 (far) albo 320×200 (close) → indeksowany bufor
+320×200 z HUD → konwersja RGBA / światło RTG dopiero przy wystawieniu na canvas.
 Dzięki temu gra nie może „wyjść" poza paletę — test w `tools/browsertest.mjs`
 sprawdza, że na ekranie jest dokładnie 0 pikseli spoza palety.
 
@@ -187,7 +212,7 @@ sprawdza, że na ekranie jest dokładnie 0 pikseli spoza palety.
 - **[docs/GDD.md](docs/GDD.md)** — projekt gry: pętla rozgrywki, ekonomia,
   AI zombie, tabela przedmiotów, balans, UI.
 - **[docs/WINDOWS.md](docs/WINDOWS.md)** — uruchomienie prototypu pod Windows
-  krok po kroku: instalacja Node.js, `npm start`, wybór trybu, testy.
+  krok po kroku: ZIP, `node tools/serve.mjs`, wybór trybu, `npm.cmd test`.
 - **[docs/amiga/](docs/amiga/)** — atlasy IFF ILBM do Deluxe Paint / Personal
   Paint: `docs/amiga/` (32 kolory, 5 bitplanów) i `docs/amiga/aga/`
   (64 kolory, 6 bitplanów), palety `.pal`, miasto `.amb`.
@@ -202,6 +227,10 @@ node tools/export_map.mjs     # miasto w formacie binarnym .amb
 node tools/stress.mjs         # 6000 losowych klatek bez wyjątków
 node tools/browsertest.mjs    # integracja main.js z atrapą DOM
 ```
+
+**v0.2.4: 204 OK, 0 FAIL**, `BROWSER-STUB TEST OK` dla obu widoków,
+0 pikseli poza paletą AGA oraz 6000 klatek stress. Pod Windows:
+`npm.cmd install`, potem `npm.cmd test` (do gry nie trzeba instalacji).
 
 Testy w Node nie potrzebują przeglądarki — `tools/shots.mjs` renderuje prawdziwe
 klatki gry do PNG przez `pngjs`.

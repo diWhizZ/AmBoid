@@ -1,6 +1,6 @@
 # AMBOID — dokument projektowy (GDD)
 
-Wersja 0.2.3 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
+Wersja 0.2.4 · prototyp HTML5 · cel docelowy: A1200 AGA / RTG
 
 ---
 
@@ -113,6 +113,13 @@ LPM na zombie podejmuje podejście bez ataku, PPM atakuje w stronę kursora.
 Kursor ma stany (idź / interakcja / zombie / blokada / brak linii wzroku),
 trasa jest rysowana kropkami, nowe kliknięcie anuluje poprzedni rozkaz, a
 kamera ma martwą strefę i wyprzedzenie za kursorem.
+
+**Widok (0.2.4):** domyślnie daleki 0,75× (bufor świata 427×267), alternatywnie
+bliski 1× (320×200). Klawisz V działa także w menu i na pauzie, URL
+`?view=far|close` ma pierwszeństwo przed `localStorage['amboid.view']`.
+HUD i kursor zawsze 320×200. Skalowanie palety MAJORITY 2×2 poprzedza
+światło RTG, a obrysy kafli i kropki trasy są rysowane już po skalowaniu.
+FOV zwiększa się odwrotnie do zoom; promień pozostaje całkowity.
 
 **Doświadczenie:** +2 XP za trafienie, +4 za zabicie; co 12 XP poziom walki
 (+2 obrażeń bazowych). Czasopisma dają +6 XP.
@@ -285,6 +292,16 @@ PPM = atak w stronę kursora. A* po siatce 8 kierunków (bez ścinania narożnik
 auto-otwieranie drzwi po drodze), podgląd trasy kropkami, stany kursora
 (idź / interakcja / zombie / blokada / brak linii wzroku), push-scroll kamery
 z martwą strefą, anulowanie rozkazu nowym kliknięciem. Klawiatura i pad pozostają w pełni sprawne.
+
+**v0.2.4 — widok daleki.** Zoom-out 0,75×, bufor 427×267, przełączanie V,
+URL i zapis ustawienia. Filtr MAJORITY 2×2 zachowuje indeksy palety; HUD i
+rozkazy pozostają ostre. Całopikselowa kamera, przeliczenia myszy/świateł/FOV,
+jasny dzień bez przygaszania pamięci mapy. 204 testy akceptacyjne.
+
+**Następny etap 4 — styl Cannon Fodder:** małe ikony z 16-kolorowej podpalety,
+2–4 klatki, mirror, krew/łuski/dym/błysk/ślady stóp, dopracowanie portretu i
+paska stanu. 70% Project Zomboid / 30% Cannon Fodder; bez RTS-izacji walki.
+Etap 5 (NPC) dopiero po etapie 4, w oddzielnej wersji.
 
 **v0.2.x** — więcej typów budynków (kościół, szkoła, bar), pojazd jako schronienie,
 alarm samochodowy, więcej broni, autotile krawędzi i więcej wariantów kafli.

@@ -1,4 +1,8 @@
 // Uruchamia prawdziwy main.js na atrapie DOM, żeby sprawdzić integrację z canvasem.
+const requestedView = process.argv.includes('--view=close') ? 'close' : 'far';
+// URL musi mieć pierwszeństwo przed zapisanym ustawieniem.
+const stored = new Map([['amboid.view', requestedView === 'far' ? 'close' : 'far']]);
+globalThis.localStorage = { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, String(value)) };
 const listeners = {};
 let rafCb = null;
 let putCount = 0;
@@ -39,6 +43,7 @@ globalThis.document = {
 };
 
 globalThis.window = {
+  location: { search: `?seed=115&view=${requestedView}` },
   innerWidth: 1280,
   innerHeight: 800,
   addEventListener(type, cb) {
@@ -58,6 +63,10 @@ globalThis.URLSearchParams = globalThis.URLSearchParams;
 
 await import('../src/main.js');
 
+if (window.AMBOID.viewMode !== requestedView || stored.get('amboid.view') !== requestedView || canvas.width !== 320 || canvas.height !== 200) {
+  throw new Error('BROWSER-STUB FAIL: ?view / localStorage / rozmiar canvas');
+}
+console.log('view from URL + localStorage:', requestedView);
 // start gry przez menu: Enter
 const keydown = (code, repeat = false) => {
   for (const cb of listeners['win:keydown'] || []) cb({ code, repeat, preventDefault() {} });
@@ -83,6 +92,12 @@ console.log('image has pixels:', lastImage && lastImage.data.some((v) => v !== 0
 keydown('Enter');
 frames(3);
 console.log('mode after Enter:', window.AMBOID.mode);
+const originalView = window.AMBOID.viewMode;
+keydown('KeyV');
+keydown('KeyV', true);
+if (window.AMBOID.viewMode === originalView) throw new Error('BROWSER-STUB FAIL: V');
+keydown('KeyV');
+if (window.AMBOID.viewMode !== originalView) throw new Error('BROWSER-STUB FAIL: powrót V');
 
 // chodzenie
 keydown('KeyS');
@@ -129,11 +144,13 @@ for (let y = 0; y < 40 && !mouseTarget; y++) {
     const path = gm.findPath(x, y, {});
     if (!path || path.length < 2 || path.length > 5) continue;
     const [sx, sy] = gm.camera.toScreen(x, y);
-    if (gm.isOverHud(sx + 16, sy + 8)) continue;
-    mouseTarget = { x, y, sx: sx + 16, sy: sy + 8 };
+    const mx = (sx + 16) * gm.zoom, my = (sy + 8) * gm.zoom;
+    if (mx < 0 || mx >= 320 || my < 0 || my >= 200 || gm.isOverHud(mx, my)) continue;
+    mouseTarget = { x, y, sx: mx, sy: my };
     break;
   }
 }
+if (!mouseTarget) throw new Error('BROWSER-STUB FAIL: brak celu myszy');
 if (mouseTarget) {
   pointer('pointerdown', mouseTarget.sx, mouseTarget.sy, 0);
   console.log('mouse target:', mouseTarget.x, mouseTarget.y, 'path:', gm.player.path.length);

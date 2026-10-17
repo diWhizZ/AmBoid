@@ -1,9 +1,10 @@
 // Testy akceptacyjne mechanik. Uruchomienie: node tools/gametest.mjs
 import { buildArt } from '../src/art.js';
-import { Screen, isoX, isoY } from '../src/render.js';
+import { Screen, Camera, isoX, isoY } from '../src/render.js';
 import { Game } from '../src/game.js';
 import { World } from '../src/world.js';
 import { ITEMS } from '../src/items.js';
+import { C } from '../src/palette.js';
 import { GamepadInput, STICK_DEADZONE } from '../src/gamepad.js';
 
 const stub = { muted: false, init() {}, play() {}, setRain() {}, setMuted() {}, toggleMute() { return true; } };
@@ -26,6 +27,8 @@ function section(name) {
 
 function newGame(seed = 1337) {
   const g = new Game(new Screen(), art, stub);
+  // Regresje 0.2.3 sprawdzamy w natywnej skali; far ma osobną sekcję niżej.
+  g.setViewMode('close', true);
   g.startGame(seed);
   return g;
 }
@@ -971,6 +974,122 @@ section('Mysz: klik-idź, kursor, kamera');
   g.click(bx, by);
   check('nowy klik anuluje stary rozkaz', !!p.order && p.order.x === b.x && p.order.y === b.y);
   check('nowa trasa prowadzi do nowego celu', p.path.length > 0 && p.path[p.path.length - 1].x === b.x && p.path[p.path.length - 1].y === b.y);
+}
+
+section('Widok daleki 0,75× (v0.2.4)');
+{
+  const g = new Game(new Screen(), art, stub);
+  g.startGame(1337);
+  g.world.zombies.length = 0;
+  check('domyślnie far: bufor 427×267, HUD 320×200', g.viewMode === 'far' && g.zoom === 0.75 &&
+    g.worldScreen.w === 427 && g.worldScreen.h === 267 && g.screen.w === 320 && g.screen.h === 200);
+
+  g.keyDown('KeyV');
+  g.keyDown('KeyV', true);
+  const close = g.viewMode === 'close' && g.worldScreen === g.screen && g.camera.viewW === 320;
+  g.keyDown('KeyV');
+  check('V przełącza far/close, auto-repeat nie przełącza', close && g.viewMode === 'far' &&
+    g.camera.viewW === 427 && g.menuCam.viewH === 267 && g.setViewMode('invalid') === 'far');
+
+  const cam = new Camera(48, 40);
+  cam.viewW = 427; cam.viewH = 267;
+  let integerCamera = true;
+  for (let t = 0; t < 1; t += 0.03125) {
+    cam.follow(15 + t, 4 - t);
+    const [sx, sy] = cam.toScreen(15 + t, 4 - t);
+    integerCamera &&= Number.isInteger(cam.offX) && Number.isInteger(cam.offY) && sx + 16 === 213 && sy + 8 === 133;
+  }
+  check('nieparzysty viewport: całe piksele i stabilny środek kamery', integerCamera);
+
+  const at = (x, y) => {
+    const [sx, sy] = g.camera.toScreen(x, y);
+    return [(sx + 16) * g.zoom, (sy + 8) * g.zoom];
+  };
+  let target = null;
+  for (let y = 0; y < 40 && !target; y++) {
+    for (let x = 0; x < 48; x++) {
+      if (!g.world.isWalkable(x, y) || g.interactionAt(x, y)) continue;
+      const path = g.findPath(x, y, {});
+      const [sx, sy] = at(x, y);
+      if (path && path.length >= 2 && path.length <= 6 && sx > 8 && sx < 312 && sy > 50 && sy < 130 && !g.isOverHud(sx, sy)) {
+        target = { x, y, sx, sy };
+        break;
+      }
+    }
+  }
+  g.pointerMove(target.sx, target.sy);
+  g.updateHover();
+  check('worldPoint i hover trafiają w ten sam kafel w far', g.hover.x === target.x && g.hover.y === target.y &&
+    g.hover.sx === target.sx / g.zoom && g.hover.sy === target.sy / g.zoom);
+  g.pointerDown(target.sx, target.sy, 0);
+  g.pointerUp(target.sx, target.sy, 0);
+  const farOrder = g.player.order && g.player.order.x === target.x && g.player.order.y === target.y && g.player.path.length > 0;
+  g.clearOrders();
+  g.pointerDown(30, 173, 0);
+  g.pointerUp(30, 173, 0);
+  check('LPM w far wyznacza trasę, sloty HUD nie są skalowane', farOrder && g.selected === 1 && g.player.path.length === 0 && !g.player.order);
+
+  const p = g.player;
+  const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => g.world.isWalkable(p.x + dx, p.y + dy));
+  const z = g.world.addZombie(p.x + dx, p.y + dy);
+  const hp = z.hp;
+  g.rightClick(...at(z.x, z.y));
+  check('PPM w far trafia wskazane zombie', p.attackCd > 0 && z.hp < hp);
+
+  g.clearOrders();
+  g.mouse.active = false;
+  g.player.path = [{ x: target.x, y: target.y }];
+  g.player.order = { kind: 'move', x: target.x, y: target.y };
+  g.renderGameScene();
+  const cx = Math.round(target.sx), cy = Math.round(target.sy);
+  check('kropki trasy są ostre po blitScaled (krzyż 3×3)', g.screen.get(cx, cy) === C.WHITE &&
+    g.screen.get(cx - 1, cy) === C.WHITE && g.screen.get(cx + 1, cy) === C.WHITE &&
+    g.screen.get(cx, cy - 1) === C.WHITE && g.screen.get(cx, cy + 1) === C.WHITE);
+
+  g.setViewMode('close', true);
+  const rClose = g.fovRadius();
+  g.setViewMode('far', true);
+  check('FOV rośnie odwrotnie do zoom i ma całkowity promień', g.fovRadius() === Math.ceil(rClose / 0.75) &&
+    Number.isInteger(g.currentFovRadius) && g.world.visible[g.world.idx(p.x, p.y)] === 1);
+
+  g.setProfile('rtg', true);
+  g.time = 23 * 60;
+  g.player.flashlightOn = true;
+  g.updateFOV(true);
+  const torch = g.getLights().find((l) => l.spread != null);
+  const [px, py] = g.camera.toScreen(p.vx, p.vy);
+  check('światła RTG skalują pozycje i promienie w far', torch && torch.sx === (px + 16) * 0.75 &&
+    torch.sy === (py - 4) * 0.75 && torch.r === 250 * 0.75 && g.worldScreen.profile.id === 'rtg');
+
+  g.pointerMove(318, 100);
+  g.updateCameraLead(0.5);
+  check('push-scroll ma ten sam dystans ekranowy po zoom-out', g.camera.lookX * g.zoom === g.leadX && g.leadX === 46);
+
+  g.setProfile('aga', true);
+  g.time = 12 * 60;
+  const day = g.tileDim(0, 0, false) === 0 && g.tileDim(47, 39, true) === 0;
+  g.time = 23 * 60;
+  const memory = g.tileDim(0, 0, false) === 3;
+  g.setProfile('rtg', true);
+  check('tileDim: RTG → jasny dzień → pamięć mapy nocą', day && memory && g.tileDim(0, 0, false) === 0);
+}
+{
+  const src = new Screen(2, 2);
+  const dst = new Screen(1, 1);
+  const samples = [
+    [[1, 9, 9, 9], 9], [[9, 1, 9, 9], 9], [[9, 9, 1, 9], 9], [[9, 9, 9, 1], 9],
+    [[1, 9, 9, 2], 9], [[1, 9, 2, 9], 9], [[1, 2, 9, 9], 9],
+    [[9, 1, 9, 1], 9], [[1, 9, 9, 1], 1], [[1, 2, 3, 4], 1],
+  ];
+  const majority = samples.every(([pixels, expected]) => {
+    src.data.set(pixels);
+    dst.blitScaled(src, 0.5);
+    return dst.data[0] === expected;
+  });
+  check('blitScaled: MAJORITY 2×2, remis = pierwsza próbka, bez mieszania RGB', majority);
+  dst.uiMask.fill(1);
+  dst.blitScaled(src, 0.5);
+  check('blitScaled usuwa uiMask poprzedniej klatki', dst.uiMask.every((v) => v === 0));
 }
 
 section('Dane i eksport');
