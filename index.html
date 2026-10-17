@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>AMBOID — Projekt Z</title>
+    <meta
+      name="description"
+      content="AMBOID — izometryczny survival zombie w 32 kolorach i 320x200, inspirowany Project Zomboid i Amigą."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #050608;
+        overflow: hidden;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: crosshair;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        background: #07090d;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+      }
+      /* delikatny CRT: scanlines + winieta, nic nie przechwytuje kliknięć */
+      .crt {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0.18) 0px,
+            rgba(0, 0, 0, 0.18) 1px,
+            transparent 1px,
+            transparent 3px
+          );
+        mix-blend-mode: multiply;
+        z-index: 10;
+      }
+      .crt::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(0, 0, 0, 0) 55%,
+          rgba(0, 0, 0, 0.45) 100%
+        );
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="screen" width="320" height="200" aria-label="AMBOID — gra"></canvas>
+    <div class="crt"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
