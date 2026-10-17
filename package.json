@@ -1,0 +1,30 @@
+{
+  "name": "amboid",
+  "version": "0.1.0",
+  "description": "AMBOID \u2014 izometryczny survival zombie w stylu Project Zomboid na Amidze (32 kolory, 320x200). Prototyp HTML5.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "shots": "node tools/shots.mjs",
+    "test": "node tools/gametest.mjs && node tools/browsertest.mjs && node tools/stress.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diWhizZ/AmBoid.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/diWhizZ/AmBoid/issues"
+  },
+  "homepage": "https://github.com/diWhizZ/AmBoid#readme",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
