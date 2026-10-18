@@ -1,4 +1,5 @@
 node_modules/
 shots/
+build/
 .DS_Store
 AmBoid-*.zip
