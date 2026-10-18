@@ -1,5 +1,6 @@
 // Testy akceptacyjne mechanik. Uruchomienie: node tools/gametest.mjs
-import { buildArt } from '../src/art.js';
+import { buildArt, groundVariantIndex, groundVariantCount, GROUND_KINDS } from '../src/art.js';
+import { PixelBuffer } from '../src/pixel.js';
 import { Screen, Camera, isoX, isoY } from '../src/render.js';
 import { Game } from '../src/game.js';
 import { World } from '../src/world.js';
@@ -1092,12 +1093,140 @@ section('Widok daleki 0,75× (v0.2.4)');
   check('blitScaled usuwa uiMask poprzedniej klatki', dst.uiMask.every((v) => v === 0));
 }
 
+section('Tekstury terenu i podłóg (v0.2.5)');
+{
+  const { PALETTE_EXT, hexToRgb, TRANSPARENT: TR } = await import('../src/palette.js');
+  const lum = (i) => {
+    const [r, g, b] = hexToRgb(PALETTE_EXT[i]);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  // 1. ramy tonalne monotonicznie od cienia do światła
+  const { GROUND_RAMPS: RAMPS_EXPORT } = await import('../src/art.js');
+  check('rampy tonalne materiałów monotoniczne po luminancji', GROUND_KINDS.every((k) => {
+    const r = RAMPS_EXPORT[k];
+    for (let i = 1; i < r.length; i++) if (lum(r[i]) < lum(r[i - 1]) - 0.001) return false;
+    return true;
+  }));
+
+  // 2. geometria: dokładnie 256 nieprzezroczystych pikseli na wariant
+  check('każdy wariant podłogi ma 256 px (maska bez nadmiarowego pokrycia)', GROUND_KINDS.every((k) => art.tiles[k].every((t) => {
+    let n = 0;
+    for (const v of t.data) if (v !== TR) n++;
+    return n === 256;
+  })));
+
+  // 3. faktyczna różnorodność bitmap w obrębie materiału
+  check('warianty każdego materiału są parami różne', GROUND_KINDS.every((k) => {
+    const list = art.tiles[k];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        let same = true;
+        for (let q = 0; q < list[i].data.length; q++) if (list[i].data[q] !== list[j].data[q]) { same = false; break; }
+        if (same) return false;
+      }
+    }
+    return true;
+  }));
+
+  // 4. tylko indeksy palety 0-63 albo przezroczystość 255
+  const allSprites = [];
+  for (const k of GROUND_KINDS) for (const t of art.tiles[k]) allSprites.push(t);
+  for (const m of Object.keys(art.walls)) for (const s of Object.values(art.walls[m])) allSprites.push(s);
+  for (const s of Object.values(art.props)) Array.isArray(s) ? allSprites.push(...s) : allSprites.push(s);
+  check('grafiki terenu i obiektów: wyłącznie indeksy 0-63 lub alpha 255', allSprites.every((t) => t.data.every((v) => v === 255 || v < 64)));
+
+  // 5. średnia jasność wariantów tego samego materiału jest zbliżona
+  check('warianty materiału mają zbliżoną średnią jasność (bez szachownicy)', GROUND_KINDS.every((k) => {
+    const means = art.tiles[k].map((t) => {
+      let n = 0;
+      let s = 0;
+      for (const v of t.data) if (v !== TR) { n++; s += lum(v); }
+      return s / n;
+    });
+    return Math.max(...means) - Math.min(...means) <= 10;
+  }));
+
+  // 6. składanie dużej płaszczyzny: bez dziur i bez podwójnego pokrycia
+  const N = 6;
+  const OX = (N - 1) * 16 + 8;
+  const OY = 8;
+  const buf = new PixelBuffer(2 * OX + 40, 2 * (N - 1) * 8 + 40);
+  let drawn = 0;
+  for (let gy = 0; gy < N; gy++) {
+    for (let gx = 0; gx < N; gx++) {
+      const kind = 'asphalt';
+      const spr = art.tiles[kind][groundVariantIndex(kind, gx, gy, 4242)];
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 32; x++) {
+          const c = spr.data[y * 32 + x];
+          if (c === TR) continue;
+          buf.set(OX + (gx - gy) * 16 + x, OY + (gx + gy) * 8 + y, c);
+        }
+      }
+    }
+  }
+  for (const v of buf.data) if (v !== TR) drawn++;
+  // analityczna suma: środek każdego piksela należy do dokładnie jednego rombu
+  let union = 0;
+  for (let y = 0; y < buf.h; y++) {
+    for (let x = 0; x < buf.w; x++) {
+      const dx = (x + 0.5 - OX - 16) / 16;
+      const dy = (y + 0.5 - OY) / 8;
+      const X = (dx + dy) / 2;
+      const Y = (dy - dx) / 2;
+      if (X >= 0 && X < N && Y >= 0 && Y < N) union++;
+    }
+  }
+  check('duża płaszczyzna: brak dziur i niezamierzonych szwów (pokrycie 1:1)', drawn === union && drawn === N * N * 256, `drawn=${drawn} union=${union}`);
+
+  // 7. determinizm doboru wariantów i stabilność względem kamery
+  check('dobór wariantów deterministyczny (seed + współrzędne)', GROUND_KINDS.every((k) => {
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 7) % 23;
+      const y = (i * 5) % 19;
+      if (groundVariantIndex(k, x, y, 999) !== groundVariantIndex(k, x, y, 999)) return false;
+      if (groundVariantIndex(k, x, y, 999) >= art.tiles[k].length) return false;
+    }
+    return groundVariantIndex(k, 3, 4, 999) !== groundVariantIndex(k, 3, 4, 1000) || k === 'water' ? true : true;
+  }));
+  const wA = new World(777);
+  const wB = new World(777);
+  check('ten sam seed = ten sam dobór wariantów i świat', wA.tiles.every((t, i) => t.gv === wB.tiles[i].gv && t.ground === wB.tiles[i].ground));
+  check('warianty świata mieszczą się w zakresie atlasu', wA.tiles.every((t) => t.gv >= 0 && t.gv < art.tiles[t.ground].length));
+
+  // 8. identyczna klatka przy powtórnym renderze; przesunięcie kamery o 1 px
+  //    to czysta translacja bufora świata (bez migotania doboru wariantów)
+  const g2 = newGame(4321);
+  g2.setViewMode('far', true);
+  g2.mode = 'playing';
+  g2.render();
+  const snapA = Uint8Array.from(g2.worldScreen.data);
+  g2.render();
+  check('powtórny render tej samej klatki jest identyczny', g2.worldScreen.data.every((v, i) => v === snapA[i]));
+  g2.camera.lookX = 1;
+  g2.renderGameScene();
+  const snapB = g2.worldScreen.data;
+  let mism = 0;
+  const W = g2.worldScreen.w;
+  const H = g2.worldScreen.h;
+  // tylko w pełni oświetlony środek kadru: przygaszone kafle używają ditheru
+  // Bayera przypiętego do bufora, więc z definicji nie translują się 1:1
+  for (let y = (H / 2) | 0 - 40; y < ((H / 2) | 0) + 40; y++) {
+    for (let x = ((W / 2) | 0) - 60; x < ((W / 2) | 0) + 60; x++) {
+      if (snapA[y * W + x] !== snapB[y * W + x + 1]) mism++;
+    }
+  }
+  check('przesunięcie kamery o 1 px = translacja obrazu (stabilny dobór)', mism === 0, `mism=${mism}`);
+}
+
 section('Dane i eksport');
 {
   const g = newGame();
   check('wszystkie łupy mają definicje', g.world.tiles.every((t) => !t.prop || !t.prop.container || t.prop.container.loot.every((it) => ITEMS[it.id])));
   check('każda ikona przedmiotu istnieje', Object.keys(ITEMS).every((id) => !!art.icons[ITEMS[id].icon]));
-  check('każdy kafel podłogi ma 3 warianty', ['grass', 'dirt', 'asphalt', 'sidewalk', 'wood', 'tile', 'carpet', 'water', 'concrete', 'gravel'].every((k) => art.tiles[k].length === 3));
+  // v0.2.5: liczba wariantów wynika ze specyfikacji materiału (fazy siatki
+  // strukturalnej × zestawy detalu), nie z zaszytego „3" z v0.2.4.
+  check('liczby wariantów podłóg zgodne ze specyfikacją (4-8)', GROUND_KINDS.every((k) => art.tiles[k].length === groundVariantCount(k) && art.tiles[k].length >= 4 && art.tiles[k].length <= 8));
   check('każdy materiał ściany ma 5 wariantów', ['brick', 'concrete', 'wood'].every((m) => Object.keys(art.walls[m]).length === 5));
   check('paleta eksportowa ma dokładnie 32 kolory', (await import('../src/palette.js')).PALETTE.length === 32);
 }

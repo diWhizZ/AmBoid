@@ -1,10 +1,21 @@
-# AMBOID — kontynuacja po v0.2.4
+# AMBOID — kontynuacja po v0.2.5
 
 Cel: A1200 AGA (64 kolory, domyślnie) albo RTG (64 + światło RGB).
 OCS 32 pozostaje tylko profilem zgodności. 70% Project Zomboid / 30% Cannon Fodder.
 Bez RTS-izacji walki, grupowego autoataku ani zmiany podstawowego survivalu.
 
 ## Stan i publikacja
+
+**v0.2.5 (grunt i podłogi)** powstała na gałęzi `arena/b923a220-amboid`
+(PR #4) z bazy main `062e61a` (v0.2.4). Zakres: przebudowa `makeGround`
+w `src/art.js` (specyfikacja `GROUND_SPEC`, wzory w UV podłogi, maska rombu
+256 px), dobór wariantów `groundVariantIndex` (świat zapisuje `gv` bez
+zużywania układu RNG z 0.2.4), krawężnik kontekstowy w `src/scene.js`,
+testy sekcji „Tekstury terenu i podłóg”, narzędzia `tools/texshots.mjs`
+i `tools/texbench.mjs`, zrzuty `docs/screens` 01–12 odświezone.
+`npm test`: **215 OK, 0 FAIL**, BROWSER-STUB far/close, stress 6000 klatek.
+Eksporty Amigi (`docs/amiga/**`) pozostały HISTORYCZNE z v0.2.4 — nie były
+regenerowane (`tools/export_amiga.mjs` celowo nieuruchamiany).
 
 v0.2.4 odtworzono z przekazanej specyfikacji na bazie main `4d301fb` (v0.2.3),
 ponieważ commit `4690d2b`, jego ZIP i wcześniejsza wersja tego dokumentu nie były

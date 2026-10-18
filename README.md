@@ -39,20 +39,59 @@ deskami, śpisz w łóżkach i próbujesz przetrwać **dwie doby**.
   <img src="docs/screens/06-mapa.png" width="49%" alt="Mapa okolicy">
 </p>
 
-## Wersja v0.2.4 — widok daleki
+## Wersja v0.2.5 — grunt i podłogi od nowa
 
 **Pobierz gotowy projekt (bez Gita):**
-[**ZIP źródeł v0.2.4 — dostępny teraz**](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.4.zip) ·
-[Release v0.2.4](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.4) ·
+[**ZIP źródeł v0.2.5**](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.5.zip) ·
+[Release v0.2.5](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.5) ·
+[ZIP gałęzi roboczej](https://github.com/diWhizZ/AmBoid/archive/refs/heads/arena/b923a220-amboid.zip) ·
 [aktualny main.zip](https://github.com/diWhizZ/AmBoid/archive/refs/heads/main.zip).
 
-**Status publikacji:** PR #2 scalony, tag i Release v0.2.4 opublikowane.
-Osobny asset `AmBoid-0.2.4.zip` czeka na wysyłkę: sandbox nie ma dostępu do
-`uploads.github.com`, a GitHub App nie ma uprawnienia `workflows`.
-ZIP tagu powyżej i „Source code (zip)” na Release są dostępne niezależnie od
-tego ograniczenia. [Szczegóły i gotowy workflow](docs/PUBLIKACJA.md).
+**Status publikacji:** PR #4 (ta wersja) otwarty z gałęzi sesji; tag i Release
+v0.2.5 tworzone z tego samego commitu co PR. Historyczny v0.2.4 pozostaje
+nietknięty: [tag v0.2.4](https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.4).
+Ograniczenie wysyłki osobnego assetu `AmBoid-*.zip` na Release jest opisane
+w [docs/PUBLIKACJA.md](docs/PUBLIKACJA.md) — ZIP tagu/gałęzi działa zawsze.
 
-Changelog:
+Changelog v0.2.5 (grafika terenu i podłóg, bez zmian geometrii i mechanik):
+- **koniec pasmowania**: usunięty gradient „oświetlenia” pojedynczego rombu,
+  który powielony na płaskiej powierzchni dawał ukośne pasy;
+- **koniec powtarzalnych prążków**: asfalt nie ma dwóch ciemnych linii w każdym
+  kaflu, beton poziomej szczeliny, drewno linii co 3 piksele;
+- wzory strukturalne (fugi płyt chodnika, deski, siatka ceramiki, dylatacje
+  betonu) liczone w **UV płaszczyzny podłogi** — są ciągłe między kaflami
+  i leżą w osiach izometrii, nie ekranu;
+- **dobór wariantów**: dokładna faza siatki strukturalnej + zestaw detalu
+  z hasza(seed, x, y); deterministyczny, stabilny przy przesuwaniu kamery,
+  bez `Math.random()` w klatce i bez zużywania RNG rozgrywki;
+- **maska rombu 256 px** (test środka piksela): duża płaszczyzna składa się
+  bez dziur i bez podwójnego pokrycia (było 272 px i ~6% nadpisań → szwy);
+  globalny `PixelBuffer.fillPoly` pozostał nietknięty;
+- **4–8 wariantów** na materiał o zbliżonej średniej jasności (koniec
+  szachownicy z jaśniejszych/ciemniejszych rombów); szczegóły jako celowe
+  skupiska pikseli, czytelne po pomniejszeniu 0,75×;
+- materiały wg briefu: asfalt = ciemna spokojna masa z pęknięciami i łatkami,
+  trawa = stonowana zieleń z kępami darni i przerzedzeniami (bez kwiatka
+  co kilka kafli), chodnik = czytelne płyty 2×2 z delikatnymi fugami,
+  **krawężnik tylko na prawdziwej granicy z jezdnią**, ziemia = płaty
+  i pojedyncze kamienie, beton = spokojne pola, deski = przesunięte łączenia,
+  ceramika = siatka w perspektywie podłogi, wykładzina = matowa z przetarciem,
+  żwir = skupiska kamieni, woda = ograniczone refleksy;
+- narzędzia developerskie: `npm run texshots` (powtarzalne kadry porównawcze
+  w ignorowanym `shots/`) i `node tools/texbench.mjs` (koszt atlasu i czasu
+  renderu tego samego kadru).
+
+Koszt (pomiar `tools/texbench.mjs`, ten sam kadr):
+| | v0.2.4 | v0.2.5 |
+| --- | --- | --- |
+| kafle terenu | 30 | 54 |
+| chunky 8 bit | 15 360 B | 27 648 B |
+| 6 bitplanów AGA | 11 520 B | 20 736 B |
+| maska rombu | 30 × 64 B | 1 × 64 B (wspólna) |
+| render kadru far 0,75× | 2,208 ms | 1,941 ms |
+| `buildArt()` | 41,1 ms | 31,6 ms |
+
+Zmiany z v0.2.4 (widok daleki) pozostają w mocy:
 - domyślny **widok daleki 0,75×**: świat 427×267, ekran nadal **320×200**;
 - **V** przełącza daleki / bliski; `?view=far|close` i zapis `amboid.view`;
 - skalowanie **indeksów palety, MAJORITY 2×2** — bez uśredniania RGB;
@@ -72,7 +111,7 @@ Potrzebujesz tylko Node.js (bez żadnych zależności produkcyjnych):
 Windows / PowerShell (również przy zablokowanym `npm.ps1`):
 
 ```powershell
-cd D:\pobrane\zomboid\AmBoid-0.2.4
+cd D:\pobrane\zomboid\AmBoid-0.2.5
 node tools/serve.mjs
 # otwórz http://localhost:8080
 ```
@@ -227,6 +266,7 @@ sprawdza, że na ekranie jest dokładnie 0 pikseli spoza palety.
 
 ```bash
 npm run shots   # zrzuty ekranu do docs/screens
+npm run texshots # powtarzalne kadry tekstur do ignorowanego shots/
 npm test        # testy logiki: ruch, walka, łupy, zabijanie okien, sen, śmierć
 node tools/export_amiga.mjs   # atlasy IFF ILBM + paleta
 node tools/export_map.mjs     # miasto w formacie binarnym .amb
@@ -234,7 +274,7 @@ node tools/stress.mjs         # 6000 losowych klatek bez wyjątków
 node tools/browsertest.mjs    # integracja main.js z atrapą DOM
 ```
 
-**v0.2.4: 204 OK, 0 FAIL**, `BROWSER-STUB TEST OK` dla obu widoków,
+**v0.2.5: 215 OK, 0 FAIL**, `BROWSER-STUB TEST OK` dla obu widoków,
 0 pikseli poza paletą AGA oraz 6000 klatek stress. Pod Windows:
 `npm.cmd install`, potem `npm.cmd test` (do gry nie trzeba instalacji).
 

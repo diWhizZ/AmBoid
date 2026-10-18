@@ -105,7 +105,7 @@ export function drawTitle(game) {
   scr.frame(23, 176, 274, 13, C.SLATE_DARK);
   txt(scr, 'STRZAŁKI + ENTER · G GRAFIKA · K SCHEMAT', tx, 179, C.BONE, { align: 'center' });
   scr.rect(287, 190, 30, 8, C.SHADOW);
-  txt(scr, 'V0.2.4', 315, 191, C.SLATE, { align: 'right' });
+  txt(scr, 'V0.2.5', 315, 191, C.SLATE, { align: 'right' });
 }
 
 // Mały portret ocalałego w HUD — twarz zmienia się wraz ze stanem gracza.

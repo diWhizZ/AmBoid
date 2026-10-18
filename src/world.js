@@ -2,6 +2,7 @@
 // Wszystko deterministyczne na podstawie seeda.
 
 import { makeRng } from './rng.js';
+import { groundVariantIndex } from './art.js';
 import { rollLoot, spawnItem, ITEMS } from './items.js';
 
 export const WORLD_W = 48;
@@ -97,6 +98,15 @@ export class World {
     return this.tiles[this.idx(x, y)];
   }
 
+  // Wariant graficzny kafla terenu (v0.2.5): deterministyczny z seeda
+  // i współrzędnych świata — faza siatki strukturalnej + detal z hasza.
+  // Zużycie RNG świata pozostaje 1:1 z v0.2.4 (jedno next() na assignment),
+  // więc ten sam seed daje identyczne budynki, łupy i zombie jak wcześniej.
+  groundVariant(kind, x, y) {
+    this.rng.next();
+    return groundVariantIndex(kind, x, y, this.seed);
+  }
+
   isRoad(x, y) {
     return ROADS_X.some(([a, b]) => x >= a && x <= b) || ROADS_Y.some(([a, b]) => y >= a && y <= b);
   }
@@ -112,7 +122,7 @@ export class World {
           x,
           y,
           ground: 'grass',
-          gv: rng.int(0, 2),
+          gv: this.groundVariant('grass', x, y),
           wall: null,
           prop: null,
           decal: null,
@@ -128,7 +138,7 @@ export class World {
         if (this.isRoad(x, y)) {
           const t = this.tile(x, y);
           t.ground = 'asphalt';
-          t.gv = rng.int(0, 2);
+          t.gv = this.groundVariant('asphalt', x, y);
         }
       }
     }
@@ -145,7 +155,7 @@ export class World {
         if (adjacent) {
           const t = this.tile(x, y);
           t.ground = 'sidewalk';
-          t.gv = rng.int(0, 2);
+          t.gv = this.groundVariant('sidewalk', x, y);
         }
       }
     }
@@ -194,7 +204,7 @@ export class World {
       for (let x = b.x; x < b.x + b.w; x++) {
         const t = this.tile(x, y);
         t.ground = b.floor;
-        t.gv = rng.int(0, 2);
+        t.gv = this.groundVariant(b.floor, x, y);
         t.inside = b.id;
       }
     }
@@ -589,7 +599,7 @@ export class World {
       if (!t || t.wall || t.prop) continue;
       if (t.ground !== 'grass') continue;
       t.ground = 'dirt';
-      t.gv = rng.int(0, 2);
+      t.gv = this.groundVariant('dirt', x, y);
     }
     for (let i = 0; i < 14; i++) {
       const x = rng.int(0, WORLD_W - 1);

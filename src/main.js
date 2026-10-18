@@ -35,7 +35,7 @@ try {
 }
 
 window.AMBOID = game;
-console.log('AMBOID v0.2.4 — widok: V (far 0,75× / close 1×), mysz: LPM idź / PPM atak, grafika: G, sterowanie: K, pad: Gamepad API');
+console.log('AMBOID v0.2.5 — widok: V (far 0,75× / close 1×), mysz: LPM idź / PPM atak, grafika: G, sterowanie: K, pad: Gamepad API');
 
 const image = ctx.createImageData(VIEW_W, VIEW_H);
 const out32 = new Uint32Array(image.data.buffer);

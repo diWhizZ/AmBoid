@@ -1,8 +1,38 @@
 // Rysowanie świata izometrycznego: podłogi, ściany, meble, postacie, efekty.
 
-import { C } from './palette.js';
+import { C, DIM_TABLES } from './palette.js';
 import { WALL_H } from './art.js';
 import { TILE_W, TILE_H } from './render.js';
+
+// Bezpieczny wybór wariantu podłogi: liczba wariantów wynika z atlasu,
+// nie z zaszytego „% 3" z v0.2.4.
+function groundSprite(art, kind, gv) {
+  const list = art.tiles[kind] || art.tiles.grass;
+  return list[((gv % list.length) + list.length) % list.length];
+}
+
+// Krawężnik rysowany WYŁĄCZNIE na rzeczywistej granicy chodnika i jezdni
+// (kontekst świata), nie na każdym kaflu chodnika jak w v0.2.4.
+// Dwa piksele: cień szczeliny przy jezdni + jasna górna krawędź krawężnika.
+function drawCurb(scr, world, x, y, sx, sy, dim) {
+  if (!world.isRoad(x + 1, y) && !world.isRoad(x, y + 1)) return;
+  const tint = (c) => (dim > 0 ? DIM_TABLES[dim][c] : c);
+  const dark = tint(C.ASPHALT_DARK);
+  const light = tint(C.CONCRETE);
+  for (let row = 8; row <= 15; row++) {
+    const half = 16 - 2 * Math.abs(row + 0.5 - 8);
+    if (world.isRoad(x + 1, y)) {
+      const b = Math.floor(15.5 + half);
+      scr.set(sx + b, sy + row, dark);
+      scr.set(sx + b - 1, sy + row, light);
+    }
+    if (world.isRoad(x, y + 1)) {
+      const a = Math.ceil(15.5 - half);
+      scr.set(sx + a, sy + row, dark);
+      scr.set(sx + a + 1, sy + row, light);
+    }
+  }
+}
 
 function wallSprite(art, wall) {
   const set = art.walls[wall.mat] || art.walls.brick;
@@ -49,7 +79,7 @@ export function isNearWall(world, x, y) {
 function drawNearWall(game, scr, art, world, t, sx, sy, dim) {
   const b = t.inside >= 0 ? world.buildings[t.inside] : null;
   const floorKind = b ? b.floor : 'concrete';
-  scr.blit(art.tiles[floorKind][t.gv % 3], sx, sy, { dim });
+  scr.blit(groundSprite(art, floorKind, t.gv), sx, sy, { dim });
   scr.line(sx, sy + 8, sx + 16, sy + 16, C.OUTLINE);
   scr.line(sx + 16, sy + 16, sx + 32, sy + 8, C.OUTLINE);
   scr.line(sx + 1, sy + 8, sx + 16, sy + 15, C.SLATE_DARK);
@@ -111,7 +141,7 @@ export function renderWorld(game, world, cam, opts = {}) {
         // niezbadany teren: bardzo ciemny, ale nie czarna dziura
         const [ux, uy] = cam.toScreen(x, y);
         if (ux > -TILE_W && ux < scr.w + TILE_W && uy > -TILE_H * 2 && uy < scr.h + TILE_H) {
-          scr.blit(art.tiles[knownTile.ground][knownTile.gv % 3], ux, uy, { dim: 4 });
+          scr.blit(groundSprite(art, knownTile.ground, knownTile.gv), ux, uy, { dim: 4 });
         }
         continue;
       }
@@ -123,7 +153,8 @@ export function renderWorld(game, world, cam, opts = {}) {
       if (t.wall && isNearWall(world, x, y)) {
         drawNearWall(game, scr, art, world, t, sx, sy, dim);
       } else {
-        scr.blit(art.tiles[t.ground][t.gv % 3], sx, sy, { dim });
+        scr.blit(groundSprite(art, t.ground, t.gv), sx, sy, { dim });
+        if (t.ground === 'sidewalk' && !reveal) drawCurb(scr, world, x, y, sx, sy, dim);
       }
       if (t.decal && !(t.wall && isNearWall(world, x, y))) {
         const sprite =
