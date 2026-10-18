@@ -1756,8 +1756,12 @@ export function buildArt() {
     'key',
     'whiskey',
   ]) {
-    art.icons[kind] = makeIcon(kind);
+    const ico = makeIcon(kind);
+    art.icons[kind] = ico;
+    art.icons[`items/${kind}`] = ico;
   }
+  art.icons['canned_food'] = art.icons['can'];
+  art.icons['items/canned_food'] = art.icons['can'];
 
   return art;
 }

@@ -145,6 +145,8 @@ export class Game {
     this.weatherTimer = 90;
     this.hordeNight = -1;
     this.victoryShown = false;
+    this.mapSource = 'proc';
+    this.tilesetSource = 'proc';
     this.menuCam = new Camera(WORLD_W, WORLD_H);
     let savedProfile = null;
     try {
@@ -383,12 +385,13 @@ export class Game {
     this.newGame(s);
   }
 
-  newGame(seed) {
+  newGame(seed, options = {}) {
     this.seed = seed >>> 0;
-    this.world = new World(this.seed);
+    const mapSource = options.mapSource || this.mapSource || 'proc';
+    this.world = new World(this.seed, { mapSource, tiledData: options.tiledData });
     this.rng = makeRng(this.seed ^ 0x9e3779b9);
     this.lastSeedLabel = this.world.seedLabel;
-    this.camera = new Camera(WORLD_W, WORLD_H);
+    this.camera = new Camera(this.world.w, this.world.h);
     this.camera.viewW = this.viewW;
     this.camera.viewH = this.viewH;
     this.player = {

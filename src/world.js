@@ -3,7 +3,8 @@
 
 import { makeRng } from './rng.js';
 import { groundVariantIndex } from './art.js';
-import { rollLoot, spawnItem, ITEMS } from './items.js';
+import { rollLoot, spawnItem, ITEMS, CONTAINER_NAMES } from './items.js';
+import { SAMPLE_TILED_MAP } from '../data/maps/sample_map.js';
 
 export const WORLD_W = 48;
 export const WORLD_H = 40;
@@ -64,8 +65,9 @@ function key(x, y) {
 }
 
 export class World {
-  constructor(seed) {
+  constructor(seed, options = {}) {
     this.seed = seed >>> 0;
+    this.options = options;
     this.rng = makeRng(this.seed);
     this.w = WORLD_W;
     this.h = WORLD_H;
@@ -82,7 +84,147 @@ export class World {
     this.doorFronts = new Set();
     this.start = { x: 15, y: 3 };
     this.seedLabel = this.seed.toString(36).toUpperCase().padStart(6, '0').slice(-6);
-    this._generate();
+
+    if (options && options.mapSource === 'tiled') {
+      this._loadTiledMap(options.tiledData || SAMPLE_TILED_MAP);
+    } else {
+      this._generate();
+    }
+  }
+
+  _loadTiledMap(map) {
+    if (!map) return this._generate();
+    this.w = map.width || WORLD_W;
+    this.h = map.height || WORLD_H;
+    const total = this.w * this.h;
+    this.tiles = new Array(total);
+    this.lampLight = new Uint8Array(total);
+    this.visible = new Uint8Array(total);
+    this.explored = new Uint8Array(total);
+
+    const layerMap = {};
+    for (const l of (map.layers || [])) layerMap[l.name] = l;
+
+    const floorData = layerMap.floor ? layerMap.floor.data : [];
+    const wallsData = layerMap.walls ? layerMap.walls.data : [];
+
+    const GROUND_TYPES = { 1: 'grass', 2: 'dirt', 3: 'concrete', 4: 'water', 5: 'asphalt' };
+
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        const i = y * this.w + x;
+        const gid = floorData[i] || 1;
+        const gkind = GROUND_TYPES[gid] || 'grass';
+        this.tiles[i] = {
+          x,
+          y,
+          ground: gkind,
+          gv: this.groundVariant(gkind, x, y),
+          wall: null,
+          prop: null,
+          decal: null,
+          inside: -1,
+          lamp: false,
+          light: 0,
+        };
+
+        const wgid = wallsData[i] || 0;
+        if (wgid > 0) {
+          this.tiles[i].wall = {
+            mat: 'brick',
+            feature: null,
+            open: false,
+            broken: false,
+            hp: 60,
+            barricade: 0,
+          };
+        }
+      }
+    }
+
+    // Drzwi
+    const doors = layerMap.doors ? layerMap.doors.objects || [] : [];
+    for (const d of doors) {
+      const dx = Math.round(d.x);
+      const dy = Math.round(d.y);
+      const t = this.tile(dx, dy);
+      if (t) {
+        let isOpen = false;
+        let isLocked = false;
+        for (const p of (d.properties || [])) {
+          if (p.name === 'state' && p.value === 'open') isOpen = true;
+          if (p.name === 'state' && p.value === 'locked') isLocked = true;
+        }
+        t.wall = {
+          mat: 'wood',
+          feature: 'door',
+          open: isOpen,
+          locked: isLocked,
+          broken: false,
+          hp: 45,
+          barricade: 0,
+        };
+      }
+    }
+
+    // Obiekty
+    const objs = layerMap.objects ? layerMap.objects.objects || [] : [];
+    for (const o of objs) {
+      const ox = Math.round(o.x);
+      const oy = Math.round(o.y);
+      const t = this.tile(ox, oy);
+      if (!t) continue;
+
+      if (o.type === 'container') {
+        let containerType = 'crate';
+        let lootList = [];
+        for (const p of (o.properties || [])) {
+          if (p.name === 'container_type') containerType = p.value;
+          if (p.name === 'loot') {
+            try { lootList = JSON.parse(p.value); } catch (e) {}
+          }
+        }
+        t.prop = {
+          kind: containerType,
+          name: CONTAINER_NAMES[containerType] || 'SKRZYNIA',
+          container: {
+            type: containerType,
+            searched: false,
+            loot: lootList,
+          },
+        };
+      } else if (o.type === 'ground_item') {
+        let itemId = 'bandage';
+        let count = 1;
+        for (const p of (o.properties || [])) {
+          if (p.name === 'item_id') itemId = p.value;
+          if (p.name === 'count') count = p.value;
+        }
+        this.dropItem(ox, oy, itemId, count);
+      } else if (o.type === 'prop') {
+        let kind = 'tree';
+        for (const p of (o.properties || [])) {
+          if (p.name === 'kind') kind = p.value;
+        }
+        t.prop = {
+          kind,
+          variant: 0,
+          name: kind.toUpperCase(),
+        };
+      }
+    }
+
+    // Spawny
+    const spawns = layerMap.spawn ? layerMap.spawn.objects || [] : [];
+    for (const sp of spawns) {
+      const sx = Math.round(sp.x);
+      const sy = Math.round(sp.y);
+      if (sp.type === 'spawn_player') {
+        this.start = { x: sx, y: sy };
+      } else if (sp.type === 'spawn_zombie') {
+        this.addZombie(sx, sy);
+      }
+    }
   }
 
   idx(x, y) {
