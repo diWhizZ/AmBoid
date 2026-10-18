@@ -299,14 +299,139 @@ src/audio.js          proceduralne SFX (WebAudio)
 tools/                serwer, testy, eksport IFF/AMB, zrzuty ekranu
 ```
 
-## Ograniczenia i uczciwe zastrzeżenia
 
-- To **prototyp przeglądarkowy**, nie build na Amigę. Prawdziwy port wymaga
-  implementacji w C/assemblerze 68030 — plan i budżet są w `docs/AMIGA.md`.
-- Grafika jest celowo surowa i ograniczona paletą; to nie jest pixel art z DPaint,
-  tylko generatory pikseli. Atlasy IFF można dopieścić ręcznie.
-- Projekt nie zawiera żadnych assetów Project Zomboid — inspiracja dotyczy
-  mechanik, nie zawartości.
+## Modułowy system mapy, ekwipunku i pipeline assetów
+
+W wersji dodano modularny system izometryczny, stackowanie przedmiotów w JSON, pipeline assetów przygotowany pod Amigę oraz kompletne zaplecze C/Assemblera dla OCS/ECS, AGA i AmigaOS/RTG.
+
+### 1. Jak dodać nową teksturę
+1. **Wygeneruj lub narysuj teksturę** w docelowym rozmiarze lub w formacie źródłowym 128×64 z promptu w `docs/prompts/` (np. `docs/prompts/terrain.md`).
+2. Jeśli używasz źródła z tłem magentowym (`#FF00FF`), zapisz plik w `assets/source_tiles/`.
+3. Uruchom narzędzie usuwania magenty i skalowania Nearest-Neighbor:
+   ```bash
+   node tools/clean-magenta.mjs assets/source_tiles assets/clean_128
+   node tools/resize-tiles.mjs assets/clean_128 assets/tiles_64 assets/tiles_32
+   ```
+4. Przeprowadź kwantyzację do docelowej palety:
+   ```bash
+   node tools/quantize-palette.mjs assets/tiles_64 assets/quantized_64 aga
+   ```
+5. Zbuduj atlasy oraz nagłówki:
+   ```bash
+   node tools/build-atlas.mjs
+   ```
+6. Zarejestruj ID assetu w `data/tilesets.json` (np. `"tile/nowy_kafel"`).
+7. Zwaliduj poprawność rozmiaru, palety i przezroczystości:
+   ```bash
+   node tools/validate-assets.mjs
+   ```
+
+### 2. Jak dodać nowy przedmiot
+1. Otwórz plik `data/items.json`.
+2. Dodaj nowy obiekt przedmiotu zgodnie ze specyfikacją:
+   ```json
+   "energy_drink": {
+     "id": "energy_drink",
+     "name": "Napój Energetyczny",
+     "stackable": true,
+     "max_stack": 10,
+     "weight": 0.25,
+     "category": "drink",
+     "use": "restore_energy",
+     "icon": "items/water",
+     "desc": "Pobudza i dodaje energii.",
+     "value": 12
+   }
+   ```
+3. Sprawdź poprawność reguł (przedmioty z indywidualnym stanem/bronie muszą mieć `stackable: false`, surowce/amunicja/leki `stackable: true`).
+4. Uruchom walidator i eksporter struktur C dla Amigi:
+   ```bash
+   npm run export-items
+   ```
+
+### 3. Jak stworzyć mapę w Tiled
+1. Otwórz program **Tiled Map Editor**.
+2. Utwórz nową mapę:
+   - Orientacja: **Isometric**
+   - Rozmiar kafla: **64×32** px (proporcja 2:1)
+3. Utwórz warstwy o ściśle określonych nazwach:
+   - `floor` (Tile Layer) — kafelki terenu (trawa, ziemia, beton, woda)
+   - `walls` (Tile Layer) — segmenty ścian zewnętrznych i wewnętrznych
+   - `doors` (Object Layer) — obiekty drzwi (właściwości: `state`: `closed`/`open`/`locked`, `key_id`)
+   - `objects` (Object Layer) — kontenery (`container_type`: `crate`/`fridge`/`car`, `loot`), rekwizyty, przedmioty
+   - `collision` (Tile Layer) — siatka blokad (1 = zablokowane)
+   - `spawn` (Object Layer) — punkty `spawn_player`, `spawn_zombie`
+   - `triggers` (Object Layer) — prostokąty akcji (`event`: `on_enter`, `action`: `open_door` / `change_terrain`)
+4. Wyeksportuj mapę jako format JSON: `Plik -> Eksportuj jako... -> JSON (*.json)` do `data/maps/nazwa_mapy.json`.
+5. Skonwertuj mapę do binarnego formatu AMB2 dla silnika gry i Amigi:
+   ```bash
+   node tools/convert-tiled-map.mjs data/maps/nazwa_mapy.json docs/amiga/nazwa_mapy.amb
+   ```
+
+### 4. Jak zbudować wersję HTML5
+1. Upewnij się, że masz zainstalowany Node.js (gra nie wymaga żadnych pakietów zewnętrznych).
+2. Uruchom lokalny serwer deweloperski:
+   ```bash
+   node tools/serve.mjs
+   ```
+3. Otwórz w przeglądarce: `http://localhost:8080`.
+4. Sterowanie:
+   - `V`: przełączanie zoomu (daleki 0.75× / bliski 1×)
+   - `G`: przełączanie trybu graficznego (OCS 32 kolory / AGA 64 kolory / RTG światło RGB)
+   - `K`: przełączanie schematu ruchu (EKRAN / IZO)
+   - LPM: ruch i interakcja myszą; PPM: atak w stronę kursora
+
+### 5. Jak zbudować wersję Bare Metal OCS/ECS (A500)
+1. Wymagania: asembler `vasmm68k_mot` oraz linker `vlink` (lub toolchain vbcc).
+2. Przejdź do katalogu `amiga/` i uruchom:
+   ```bash
+   make ocs
+   ```
+3. Alternatywnie wygeneruj gotowy, bootowalny obraz dyskietki 880 KB ADF:
+   ```bash
+   node tools/build_adf.mjs
+   ```
+   Wynikowy plik: `build/amiga/AmBoid_OCS.adf`.
+4. Uruchomienie w WinUAE / Amiberry:
+   - Model: Amiga 500 / 600
+   - Chipset: OCS lub ECS
+   - Pamięć: 1 MB Chip RAM (lub 512 KB Chip + 512 KB Slow)
+   - Włóż dyskietkę `AmBoid_OCS.adf` do stacji DF0: i zresetuj emulator.
+
+### 6. Jak zbudować wersję Bare Metal AGA (A1200)
+1. Wymagania: asembler `vasmm68k_mot` z flagą `-m68020` lub kompilator m68k.
+2. Zbuduj binarkę AGA:
+   ```bash
+   make aga
+   ```
+3. Wygeneruj bootowalny obraz dyskietki AGA:
+   ```bash
+   node tools/build_adf.mjs
+   ```
+   Wynikowy plik: `build/amiga/AmBoid_AGA.adf`.
+4. Uruchomienie w WinUAE / Amiberry:
+   - Model: Amiga 1200
+   - Procesor: 68020 lub 68030
+   - Chipset: AGA
+   - Pamięć: 2 MB Chip RAM + minimum 4–8 MB Fast RAM
+   - Włóż dyskietkę `AmBoid_AGA.adf` do DF0:
+
+### 7. Jak zbudować wersję AmigaOS / Workbench (RTG / Intuition)
+1. Wymagania: `m68k-amigaos-gcc` z NDK 3.2 lub vbcc z zestawem bibliotek AmigaOS.
+2. Kompilacja:
+   ```bash
+   make amigaos
+   ```
+   Wynikowy plik wykonywalny: `build/AmBoid`.
+3. Przygotowanie paczki instalacyjnej Workbench:
+   ```bash
+   make package
+   ```
+   Struktura w `build/amiga/AmBoid_AmigaOS` zawiera plik wykonywalny, katalogi `data/maps/`, `assets/`, dokumentację i ikony `.info`.
+4. Uruchomienie:
+   - Skopiuj katalog na dysk twardy Amigi (DH0:Games/AmBoid).
+   - Kliknij dwukrotnie ikonę `AmBoid` na Workbenchu.
+   - Gra otworzy okno Intuition w trybie RTG lub na ekranie AGA.
 
 ## Licencja i pochodzenie
 
@@ -316,3 +441,5 @@ Project Zomboid należy do The Indie Stone; Amiga to znak Commodore.
 ## Izometryczna mapa 64×32 i pipeline assetów
 
 Nowy niezależny demonstrator Canvas2D uruchom przez `npm start` i otwórz `/map-demo.html` (link jest też dostępny z ekranu gry). Sterowanie: WASD/strzałki, E przy drzwiach, +/- zoom. Mapa testowa Tiled, atlas 64×32, binarny konwerter AMI2 i pipeline Amiga-ready opisano w [docs/ISOMETRIC.md](docs/ISOMETRIC.md). Oryginalny Floor Pack pobierz samodzielnie (CC0) i rozpakuj wariant Small 128×64 w `assets/source/isotilepack/`; demo zawiera autorskie fixture, nie kopię pakietu.
+
+> Ten demonstrator (PR #5) ma własne, zacommitowane fixture 64×32 w `assets/atlases/` i `maps/`, więc działa bez regenerowania assetów. Kanonicznym pipeline'em projektu jest `npm run pipeline` opisany wyżej: kafle 32×16 / 64×64, format `AMB2`, eksport do `docs/amiga`.
