@@ -135,30 +135,62 @@ Zamiast ręcznie robionych `assets/source_tiles/*.png` można użyć packa
 <https://screamingbrainstudios.itch.io/isotilepack>). Wariant **Small 128×64**
 jest jedynym dozwolonym; Large 256×128 nie wchodzi do tego pipeline'u.
 
+**Uwaga na zawartość archiwum:** to jedno pobranie zawiera **trzy** packi —
+*Floor Tiles*, *Overworld* i *Wall Pack*. Ściany mają inne proporcje (64×96,
+72×100) i są bezużyteczne w tym pipeline'ie; overworld to nie podłogi. Dlatego
+importer ma filtry ścieżek i twardą bramkę geometrii 2:1.
+
 ```bash
 # 1. rozpakuj pack do assets/source/isotilepack/ (katalog jest w .gitignore,
 #    poza zacommitowanymi fixture'ami demo/)
-npm run import-pack -- --dry-run     # raport: ile kafli, jakie materiały
-npm run import-pack                  # -> assets/source_pack/<rodzaj>_<nn>.png + NOTICE.md
+npm run import-pack -- --only "Floor Tiles" --dry-run              # raport
+npm run import-pack -- --only "Floor Tiles" --per-material 8 \
+    --preview shots/pack-preview.png --list shots/pack-candidates.txt
+npm run import-pack -- --only "Floor Tiles" --per-material 8        # -> assets/source_pack/
 npm run pipeline:pack                # clean-magenta -> resize -> quantize (nadpisuje assets/clean_128 itd.)
 npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE docs/amiga/**)
 ```
 
 - Importer (`tools/import-isotilepack.mjs`) sam tnie arkusze, wykrywa rozmiar
   kafla z nazwy pliku (`128x64`), składa płaski katalog i deduplikuje piksele.
-- Mapowanie materiałów packa na `GROUND_SPEC` jest w `DEFAULT_MATERIAL_MAP`
-  (np. `dry → dirt`, `stone → concrete`, `brick → sidewalk`, `ice → skip`).
-  Nadpisanie: `--map brick=tile,ice=skip`.
-- Domyślnie bierze **4 kafle na rodzaj** (kuracja, wariant „D”), równomiernie
-  z całego zbioru; `--all` bierze wszystko. `--per-material N` zmienia limit.
-- `assets/source_pack/NOTICE.md` dokumentuje CC0 i źródło. **Surowy pack nie jest
-  commitowany** (`.gitignore`); do repo wchodzi skuratorowany `assets/source_pack/`
-  (mały, czyni pipeline odtwarzalnym) oraz pochodne atlasy.
-- Test importera: `npm run test:pack` (12/12, nie wymaga packa — buduje
+- **Bramka 2:1**: każde `tileW !== 2 × tileH` jest pomijane z raportem. To chroni
+  przed ścianami i „thick” overworldem, których `resize-tiles` nie umie przeskalować.
+- **Filtry**: `--only <fragment>` / `--include`, `--exclude <fragment>` (powtarzalne,
+  dopasowanie po fragmencie ścieżki). Bez nich packi mieszają się w jeden stos.
+- **Mapowanie** materiałów packa na `GROUND_SPEC` (`DEFAULT_MATERIAL_MAP`):
+
+  | pack | rodzaj | uwaga |
+  |---|---|---|
+  | Grass, Flora | `grass` | |
+  | Dry | `dirt` | |
+  | Rocky, Stones | `gravel` | |
+  | Metal, Stone | `concrete` | |
+  | Wood | `wood` | |
+  | Tile | `tile` | ceramika |
+  | Pattern | `carpet` | w tym packu to wzorzyste wykładziny |
+  | Brick | `sidewalk` | bruk/płytki |
+  | Elements | `water` | tylko kafle wodne — wybierz `--pick water=1..18` |
+  | Grill | `asphalt` | **dyskusyjne**: to kratki/ryfle metalowe, nie asfalt |
+  | Ice | — | pomijane (brak rodzaju w `GROUND_SPEC`) |
+
+  Nadpisanie: `--map grill=concrete,ice=skip`.
+- **Kuracja**: domyślnie **4 kafle na rodzaj** równomiernie z całego zbioru;
+  `--per-material N`, `--all` (wszystko). Ręczny wybór: `--pick grass=1,5,9`
+  (numery 1-based z `--list`), a `--preview <plik.png>` rysuje kontaktówkę
+  wybranych kafli (także z `--dry-run`), `--preview-cols N` ją zawęża.
+- `assets/source_pack/NOTICE.md` dokumentuje CC0, źródło i **komendę odtworzenia**
+  (z filtrami i `--pick`). **Surowy pack nie jest commitowany** (`.gitignore`);
+  do repo wchodzi skuratorowany `assets/source_pack/` (mały, czyni pipeline
+  odtwarzalnym) oraz pochodne atlasy.
+- Test importera: `npm run test:pack` (21/21, nie wymaga packa — buduje
   syntetyczne arkusze z fixture'ów `assets/source/isotilepack/demo/`).
 - `png_mini.js` obsługuje też PNG indeksowane (colorType 3, 1/2/4/8 bitów,
   `PLTE` + `tRNS`), bo packi na itch.io często takie są. 16-bit i interlace
   są jawnie odrzucane.
+
+**Do wykorzystania później:** `Wall Pack` (Flat 64×96, Thick 72×100) to gotowe
+ściany i okna — materiał na osobny etap (geometria `WALL_H`, inne skalowanie niż
+podłogi), nie na ten importer. Nie mieszać z podłogami przy okazji.
 
 Dodatkowy, **niezależny** demonstrator z PR #5 (`map-demo.html`) ma własne,
 zacommitowane fixture 64×32: `maps/tiled/demo.json`, `assets/atlases/floor-64.png`,
@@ -189,7 +221,7 @@ npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 | `tools/stress.mjs` | 6000 klatek bez błędu |
 | `tools/test-modular-system.mjs` | **65/65 OK** |
 | `tools/isometric/test.mjs` | `isometric pipeline tests passed` |
-| `tools/test-isotilepack-import.mjs` | **12/12 OK** (import packa + łańcuch skalowania) |
+| `tools/test-isotilepack-import.mjs` | **21/21 OK** (import packa, filtry, geometria 2:1, `--pick`, kontaktówka, łańcuch skalowania) |
 
 ### Pułapka: `build/` nie jest w gicie
 
@@ -293,7 +325,7 @@ cd AmBoid
 git checkout main            # albo gałąź zadania
 npm install
 node tools/build_adf.mjs     # obejście braku build/ (placeholdery)
-npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 12/12
+npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 21/21
 ```
 
 Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.

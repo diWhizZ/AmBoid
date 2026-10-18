@@ -338,9 +338,13 @@ npm run pipeline:pack:full   # + atlasy, mapa, items, eksport (NADPISUJE docs/am
 ```
 
 Importer sam wykrywa rozmiar kafla z nazwy pliku, mapuje materiały packa na
-rodzaje z `src/art.js` (`GROUND_SPEC`) i domyślnie wybiera 4 kafle na rodzaj
-(`--per-material`, `--all`, `--map`, `--dry-run`). Test: `npm run test:pack`.
-Szczegóły: [docs/BIBLIA-PROJEKTU.md](docs/BIBLIA-PROJEKTU.md) §4a.
+rodzaje z `src/art.js` (`GROUND_SPEC`) i domyślnie wybiera 4 kafle na rodzaj.
+Przydatne opcje: `--only "<fragment>"` / `--exclude` (archiwum zawiera też
+ściany i overworld), `--per-material N`, `--all`, `--pick grass=1,5,9`,
+`--preview shots/podglad.png`, `--list shots/kandydaci.txt`, `--map`, `--dry-run`.
+Kafle o proporcjach innych niż 2:1 (ściany 64×96, 72×100) są zawsze pomijane.
+Test: `npm run test:pack`.
+Szczegóły i tabela mapowania: [docs/BIBLIA-PROJEKTU.md](docs/BIBLIA-PROJEKTU.md) §4a.
 
 ### 2. Jak dodać nowy przedmiot
 1. Otwórz plik `data/items.json`.

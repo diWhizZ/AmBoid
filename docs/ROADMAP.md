@@ -6,7 +6,7 @@ Stan na **2026-10-19**:
 - tagi i Release: `v0.2.4`, `v0.2.5`,
 - gałąź bieżąca: `feat/import-isotilepack` (import packa CC0),
 - bramka: `npm test` = **215 OK / 0 FAIL**, modular **65/65**, iso **passed**,
-  pack **12/12**,
+  pack **21/21**,
 - kontekst projektu: [`docs/BIBLIA-PROJEKTU.md`](BIBLIA-PROJEKTU.md),
 - dystrybucja: [`docs/WHDLOAD.md`](WHDLOAD.md).
 
@@ -32,12 +32,18 @@ Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
 
 - [x] `tools/import-isotilepack.mjs` — cięcie arkuszy 128×64, detekcja materiału
       z nazw plików/folderów, mapa na `GROUND_SPEC`, deduplikacja, kuracja
-      (`--per-material`, domyślnie 4), `NOTICE.md` (CC0)
-- [x] `tools/test-isotilepack-import.mjs` — 12/12 (m.in. PNG indeksowany,
-      determinizm, łańcuch clean→resize→quantize); wpięty w `npm test`
+      (`--per-material`, domyślnie 4), filtry ścieżek (`--only`/`--exclude`),
+      twarda bramka geometrii 2:1, ręczny wybór (`--pick`), kontaktówka
+      (`--preview`), katalog kandydatów (`--list`), `NOTICE.md` (CC0)
+- [x] `tools/test-isotilepack-import.mjs` — 21/21 (m.in. PNG indeksowany,
+      determinizm, filtry, bramka 2:1, `--pick`, kontaktówka, łańcuch
+      clean→resize→quantize); wpięty w `npm test`
 - [x] `png_mini.js`: obsługa PNG indeksowanych (PLTE + tRNS, 1/2/4/8 bitów)
 - [x] Skrypty `import-pack`, `pipeline:pack`, `pipeline:pack:full`, `test:pack`
 - [x] `.gitignore`: surowy pack poza repo
+- [x] Weryfikacja na realnym packu: Floor Pack = 28 arkuszy / 504 kafle;
+      pokrycie 10/10 rodzajów (po przemapowaniu `Pattern → carpet`); ściany
+      i overworld odsiane bramką 2:1 (47 plików)
 
 ## Etap 4 — następna wersja (grafika rozgrywki)
 
@@ -70,6 +76,20 @@ rozstrzygnięcia zostaje **jak pack trafia do gry**:
 - **wariant „pack”:** atlasy z packa zastępują proceduralne podłogi — wymaga
   przeładowania `data/tilesets.json` (współrzędne atlasów!) i decyzji, czy
   trzymać flagę `?art=pack`, czy przełączyć na stałe.
+
+Rezultat weryfikacji na realnym packu (2026-10-19):
+
+- Floor Pack daje **wszystkie 10 rodzajów**; `Pattern` przemapowane na `carpet`,
+  więc `carpet` ma wreszcie źródło plikowe.
+- **`asphalt` ← `Grill`** to najsłabsze ogniwo: to kratki i ryfle metalowe
+  (industriale), nie jezdnia. Do decyzji: albo zaakceptować, albo dać
+  `Grill → concrete` i zostawić `asphalt` proceduralny/narysować osobno.
+- **`water` ← `Elements`**: arkusz `Elements_01` to woda, `Elements_02` to
+  bagno/mul — wybierać ręcznie (`--pick water=1..18`).
+- **`ice`** pomijane (brak rodzaju); `Wall Pack` (64×96, 72×100) to materiał na
+  osobny etap ścian, nie na ten importer.
+- Artefakty do oceny (gitignored `shots/`): `shots/pack-preview-08.png`,
+  `shots/pack-all-18.png`, `shots/pack-candidates.txt`, `shots/compare-kinds.png`.
 
 Rekomendacja: najpierw doprowadzić pack do atlasów Amigi i ocenić je wizualnie
 (Amiberry 8.3.0 jest w systemie), dopiero potem decydować o przeglądarce. Nie
@@ -130,7 +150,7 @@ ADF przestaje być domyślnym artefaktem — zostaje trybem zgodności/deweloper
 ## Proces (obowiązuje w każdym zadaniu)
 
 1. Gałąź zadania (`arena/<id>-amboid` albo `feat/<temat>`), nigdy praca wprost na `main`.
-2. Zmiana + `npm test` (215 OK / 0 FAIL, modular 65/65, iso passed, pack 12/12).
+2. Zmiana + `npm test` (215 OK / 0 FAIL, modular 65/65, iso passed, pack 21/21).
 3. PR do `main`, opis przez `gh api --method PATCH ... -f body=...`.
 4. Jawny merge: `gh pr merge <nr> --merge`.
 5. Tag + Release z tego samego commitu; ZIP źródeł jako asset Release.

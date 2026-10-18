@@ -61,12 +61,12 @@ function writePng(file, png) {
 }
 
 // Syntetyczny kafel w jednym kolorze (z delikatną szachownicą, żeby nie był płaski).
-function makeTile(r, g, b) {
-  const p = new PNG({ width: TILE.w, height: TILE.h });
-  for (let y = 0; y < TILE.h; y++) {
-    for (let x = 0; x < TILE.w; x++) {
+function makeTile(r, g, b, w = TILE.w, h = TILE.h) {
+  const p = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
       const k = ((x >> 3) + (y >> 3)) % 2 ? 1 : 0.82;
-      const i = (y * TILE.w + x) * 4;
+      const i = (y * w + x) * 4;
       p.data[i] = Math.round(r * k);
       p.data[i + 1] = Math.round(g * k);
       p.data[i + 2] = Math.round(b * k);
@@ -271,6 +271,99 @@ check('quantize aga: 64 kolory, wymiary bez zmian', () => {
     }
     assert(colors.size <= 64, `${n}: ${colors.size} kolorów`);
   }
+});
+
+console.log('== 4. Filtry ścieżek i geometria 2:1 ==');
+// Osobny, mały "pack" z trzema zestawami naraz (jak realny upload użytkownika:
+// podłogi + ściany + overworld).
+const pack2 = path.join(tmp, 'pack2');
+const out2f = path.join(tmp, 'out-filters');
+writePng(path.join(pack2, 'Exterior/Grass Terrain/SBS - Grass - 128x64.png'),
+  composeSheet([makeTile(0, 200, 0), makeTile(0, 180, 0)], 2));
+writePng(path.join(pack2, 'Overworld/Flat/Overworld - Water - Flat 128x64.png'), makeTile(0, 100, 200));
+// Geometrie inne niż 2:1 — muszą zostać pominięte (pipeline jest ściśle 2:1).
+writePng(path.join(pack2, 'Interior/Wall Pack/Flat_Brick_01-SE-64x96.png'), makeTile(150, 150, 150, 64, 96));
+writePng(path.join(pack2, 'Overworld/Thick/Overworld - Terrain - Thick 128x72.png'), makeTile(120, 120, 120, 128, 72));
+
+const res2 = importIsotilePack({ inputDir: pack2, outputDir: out2f, perMaterial: 3 });
+
+check('kafle inne niż 2:1 pominięte (ściany, thick overworld)', () => {
+  assert(res2.skipped.wrongAspect === 2, `nie 2:1: ${res2.skipped.wrongAspect} (oczekiwano 2)`);
+  assert(res2.wrongAspectDirs.has('Interior/Wall Pack'), `katalogi: ${[...res2.wrongAspectDirs.keys()]}`);
+  assert(res2.wrongAspectDirs.has('Overworld/Thick'), `katalogi: ${[...res2.wrongAspectDirs.keys()]}`);
+  assert(res2.report.length === 2, `rodzaje: ${res2.report.map((r) => r.kind)}`);
+});
+
+check('--only zawęża do wybranego fragmentu ścieżki', () => {
+  const out = path.join(tmp, 'out-only');
+  const r = importIsotilePack({ inputDir: pack2, outputDir: out, perMaterial: 3, only: ['grass terrain'] });
+  assert(r.usedFiles === 1 && r.files === 4, `użyte ${r.usedFiles} / wszystkich ${r.files}`);
+  assert(r.report.length === 1 && r.report[0].kind === 'grass', `rodzaje: ${r.report.map((x) => x.kind)}`);
+  assert(r.skipped.wrongAspect === 0, `nie 2:1: ${r.skipped.wrongAspect}`);
+  const names = fs.readdirSync(out).filter((f) => f.endsWith('.png'));
+  assert(names.length === 2, `plików: ${names.length}`);
+});
+
+check('--exclude odrzuca wskazane ścieżki', () => {
+  const out = path.join(tmp, 'out-excl');
+  const r = importIsotilePack({ inputDir: pack2, outputDir: out, perMaterial: 3, exclude: ['overworld'] });
+  assert(r.usedFiles === 2 && r.files === 4, `użyte ${r.usedFiles} / wszystkich ${r.files}`);
+  assert(!r.report.some((x) => x.kind === 'water'), `rodzaje: ${r.report.map((x) => x.kind)}`);
+  assert(r.report.some((x) => x.kind === 'grass'), 'brak grass');
+});
+
+check('filtr odrzucający wszystko to czytelny błąd', () => {
+  let err = null;
+  try {
+    importIsotilePack({ inputDir: pack2, outputDir: path.join(tmp, 'out-none'), only: ['nie-ma-takiej-sciezki'] });
+  } catch (e) { err = e; }
+  assert(err && /--only\/--exclude/.test(err.message), `błąd: ${err && err.message}`);
+});
+
+check('NOTICE.md zawiera komendę odtworzenia z filtrami', () => {
+  const out = path.join(tmp, 'out-only');
+  const notice = fs.readFileSync(path.join(out, 'NOTICE.md'), 'utf8');
+  assert(/--only "grass terrain"/.test(notice), 'brak komendy odtworzenia');
+});
+
+check('--pick wybiera kafle po numerach (1-based)', () => {
+  const out = path.join(tmp, 'out-pick');
+  // Kandydaci grass są w kolejności arkusza (row-major); nr 2 = demo-02.
+  const r = importIsotilePack({ inputDir: packDir, outputDir: out, picks: { grass: [2, 4] } });
+  const grass = r.report.find((x) => x.kind === 'grass');
+  assert(grass.picked === 2, `wybrano ${grass.picked}`);
+  const expected = PNG.sync.write(demoPngs[1]);
+  const got = fs.readFileSync(path.join(out, 'grass_01.png'));
+  assert(got.equals(expected), 'grass_01 nie jest 2. kandydatem');
+  assert(fs.readdirSync(out).filter((f) => /^grass_\d{2}\.png$/.test(f)).length === 2, 'zła liczba plików grass');
+});
+
+check('--pick poza zakresem to czytelny błąd', () => {
+  let err = null;
+  try {
+    importIsotilePack({ inputDir: packDir, outputDir: path.join(tmp, 'out-pick-bad'), picks: { grass: [999] } });
+  } catch (e) { err = e; }
+  assert(err && /--pick grass=999/.test(err.message), `błąd: ${err && err.message}`);
+});
+
+check('--preview zapisuje kontaktówkę (także w dry-run)', () => {
+  const prev = path.join(tmp, 'podglad', 'preview.png');
+  const r = importIsotilePack({ inputDir: packDir, outputDir: path.join(tmp, 'out-prev'), preview: prev, perMaterial: 3, dryRun: true });
+  assert(fs.existsSync(prev), 'brak pliku kontaktówki');
+  const p = PNG.sync.read(fs.readFileSync(prev));
+  assert(r.preview && p.width === r.preview.width && p.height === r.preview.height,
+    `nagłówek ${r.preview && r.preview.width}x${r.preview && r.preview.height} != plik ${p.width}x${p.height}`);
+  assert(r.preview.rows === r.report.length, `wiersze ${r.preview.rows} != rodzaje ${r.report.length}`);
+  assert(!fs.existsSync(path.join(tmp, 'out-prev')), 'dry-run nie może pisać kafli');
+});
+
+check('--list zapisuje katalog kandydatów z numerami', () => {
+  const listFile = path.join(tmp, 'kandydaci.txt');
+  importIsotilePack({ inputDir: packDir, outputDir: path.join(tmp, 'out-list'), perMaterial: 3, list: listFile });
+  const txt = fs.readFileSync(listFile, 'utf8');
+  const lines = txt.split('\n');
+  assert(/^grass \(8\)$/m.test(txt), `brak nagłówka grass: ${lines.slice(0, 4).join(' | ')}`);
+  assert(lines.some((l) => /^\s+1\s+.*#0$/.test(l)), 'brak pozycji 1 z numerem kafla w arkuszu');
 });
 
 // --- podsumowanie ------------------------------------------------------
