@@ -25,7 +25,7 @@ npm start              # serwer podglądu, tools/serve.mjs, http://localhost:808
 npm test               # PEŁNY zestaw: gametest + browsertest + browsertest --view=close + stress + test-modular-system + isometric/test
 npm run test:modular   # tylko testy modułów i zgodności z eksportem Amigi (65/65)
 npm run test:iso       # tylko silnik izometryczny z PR #5 (map-demo.html)
-npm run test:pack      # tylko import packa CC0 + clean/resize/quantize (21/21)
+npm run test:pack      # tylko import packa CC0 + clean/resize/quantize (24/24)
 npm run pipeline       # clean-magenta -> resize-tiles -> quantize-palette -> build-atlas -> convert-tiled-map -> export-items -> export-amiga
 npm run import-pack    # tnie pack CC0 (Small 128x64) -> assets/source_pack + NOTICE.md
 npm run pipeline:pack  # clean-magenta/resize/quantize na assets/source_pack (nadpisuje assets/clean_128, tiles_*, quantized_64)
@@ -89,7 +89,7 @@ w każdym zadaniu graficznym:
 ## Testy i jakość
 
 - Przed każdym PR: `npm test`, wymagane **215 OK / 0 FAIL**, modular **65/65**
-  i import packa **21/21**. `BROWSER-STUB` dla widoków far/close jest oczekiwany
+  i import packa **24/24**. `BROWSER-STUB` dla widoków far/close jest oczekiwany
   (brak prawdziwego DOM).
 - Nową regułę mechaniczną dodawaj do `tools/gametest.mjs`, a regułę dotyczącą
   modułów/eksportu do `tools/test-modular-system.mjs`.

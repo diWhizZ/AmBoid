@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { PNG } from './png_mini.js';
-import { importIsotilePack } from './import-isotilepack.mjs';
+import { importIsotilePack, parsePickNumbers, formatPickNumbers } from './import-isotilepack.mjs';
 import { cleanMagentaDirectory } from './clean-magenta.mjs';
 import { resizeTilesBatch } from './resize-tiles.mjs';
 import { quantizeDirectory } from './quantize-palette.mjs';
@@ -231,9 +231,33 @@ const t64 = path.join(tmp, 't64');
 const t32 = path.join(tmp, 't32');
 const q64 = path.join(tmp, 'q64');
 
+// Osierocone pliki z poprzedniego przebiegu (np. proceduralny `path_01` po
+// przełączeniu źródła na pack) nie mogą wejść do tiles_* ani atlasu.
+const staleName = 'zzz_stale_01.png';
+for (const dir of [cleanDir, t64, t32, q64]) {
+  writePng(path.join(dir, staleName), makeTile(9, 9, 9));
+}
+
 cleanMagentaDirectory(outDir, cleanDir);
 resizeTilesBatch(cleanDir, t64, t32);
 quantizeDirectory(t64, q64, 'aga');
+
+check('każdy etap sprząta osierocone pliki', () => {
+  for (const dir of [cleanDir, t64, t32, q64]) {
+    assert(!fs.existsSync(path.join(dir, staleName)), `został ${staleName} w ${dir}`);
+  }
+  const src = fs.readdirSync(outDir).filter((f) => f.endsWith('.png')).length;
+  const c = fs.readdirSync(cleanDir).filter((f) => f.endsWith('.png')).length;
+  assert(c === src, `clean: ${c}, source: ${src}`);
+});
+
+check('czyszczenie w miejscu (in == out) nie kasuje źródeł', () => {
+  const inPlace = path.join(tmp, 'inplace');
+  writePng(path.join(inPlace, 'grass_01.png'), makeTile(0, 200, 0));
+  writePng(path.join(inPlace, 'grass_02.png'), makeTile(0, 180, 0));
+  cleanMagentaDirectory(inPlace, inPlace);
+  assert(fs.readdirSync(inPlace).filter((f) => f.endsWith('.png')).length === 2, 'zjedzono pliki');
+});
 
 check('clean-magenta: 128x64', () => {
   for (const n of fs.readdirSync(cleanDir)) {
@@ -344,6 +368,18 @@ check('--pick poza zakresem to czytelny błąd', () => {
     importIsotilePack({ inputDir: packDir, outputDir: path.join(tmp, 'out-pick-bad'), picks: { grass: [999] } });
   } catch (e) { err = e; }
   assert(err && /--pick grass=999/.test(err.message), `błąd: ${err && err.message}`);
+});
+
+check('--pick obsługuje zakresy (1-3,6)', () => {
+  assert(JSON.stringify(parsePickNumbers('1-3,6')) === JSON.stringify([1, 2, 3, 6]), 'zakres nie działa');
+  assert(JSON.stringify(parsePickNumbers('2, 5-6')) === JSON.stringify([2, 5, 6]), 'spacje/łączony zapis');
+  assert(formatPickNumbers([1, 2, 3, 4, 7, 8]) === '1-4,7,8', `format: ${formatPickNumbers([1, 2, 3, 4, 7, 8])}`);
+  assert(formatPickNumbers([5]) === '5' && formatPickNumbers([1, 3]) === '1,3', 'krótkie serie');
+  const out = path.join(tmp, 'out-range');
+  const r = importIsotilePack({ inputDir: packDir, outputDir: out, picks: { grass: [1, 8] } });
+  assert(r.report.find((x) => x.kind === 'grass').picked === 2, 'zły wybór zakresowy');
+  const notice = fs.readFileSync(path.join(out, 'NOTICE.md'), 'utf8');
+  assert(/--pick grass=1,8/.test(notice), 'NOTICE bez wyboru');
 });
 
 check('--preview zapisuje kontaktówkę (także w dry-run)', () => {

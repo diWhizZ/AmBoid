@@ -23,9 +23,12 @@ export const DEFAULT_MATERIAL_MAP = {
   grass: 'grass', flora: 'grass', bush: 'grass', plant: 'grass',
   dry: 'dirt', dirt: 'dirt', mud: 'dirt', soil: 'dirt',
   rocky: 'gravel', stones: 'gravel', gravel: 'gravel', rubble: 'gravel',
-  stone: 'concrete', concrete: 'concrete', metal: 'concrete', steel: 'concrete',
+  // "Stone" w tym packu to płyty kamienne (bruk) — nasze jezdnie.
+  stone: 'asphalt', asphalt: 'asphalt',
+  concrete: 'concrete', metal: 'concrete', steel: 'concrete',
+  // "Grill" to kratki i ryfle metalowe — podłoga przemysłowa, nie droga.
+  grill: 'concrete', grate: 'concrete',
   brick: 'sidewalk', sidewalk: 'sidewalk', pavement: 'sidewalk', paving: 'sidewalk',
-  asphalt: 'asphalt', grill: 'asphalt', grate: 'asphalt',
   tile: 'tile', ceramic: 'tile', mosaic: 'tile',
   // "Pattern" w tym packu to wzorzyste wykładziny/dywany, nie kafle.
   carpet: 'carpet', rug: 'carpet', pattern: 'carpet',
@@ -141,6 +144,34 @@ function pickByNumbers(list, numbers, kind) {
   });
 }
 
+/** "1,3,5-8" -> [1,3,5,6,7,8] (zakresy i pojedyncze numery). */
+export function parsePickNumbers(spec) {
+  const out = [];
+  for (const part of String(spec).split(',')) {
+    const m = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) {
+      for (let i = Number(m[1]); i <= Number(m[2]); i++) out.push(i);
+    } else if (part.trim() !== '') {
+      out.push(Number(part.trim()));
+    }
+  }
+  return out;
+}
+
+/** [1,2,3,4,7,8] -> "1-4,7,8" (odwrotność parsePickNumbers, do NOTICE). */
+export function formatPickNumbers(nums) {
+  const out = [];
+  let i = 0;
+  while (i < nums.length) {
+    let j = i;
+    while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
+    if (j - i >= 2) out.push(`${nums[i]}-${nums[j]}`);
+    else for (let k = i; k <= j; k++) out.push(String(nums[k]));
+    i = j + 1;
+  }
+  return out.join(',');
+}
+
 /**
  * Kontaktówka: wiersz = rodzaj, kolumny = wybrane kafle (skala 2x, tło szachownica).
  * Służy do oceny wyboru przed uruchomieniem pipeline'u.
@@ -225,8 +256,12 @@ export function importIsotilePack(opts = {}) {
   const picks = opts.picks || {};
   const materialMap = { ...DEFAULT_MATERIAL_MAP, ...(opts.materialMap || {}) };
   const dryRun = Boolean(opts.dryRun);
-  const only = (opts.only || []).map((s) => String(s).toLowerCase());
-  const exclude = (opts.exclude || []).map((s) => String(s).toLowerCase());
+  // Do NOTICE zapisujemy oryginalne fragmenty (z wielkością liter), a do
+  // dopasowania — wersje małymi literami.
+  const onlyRaw = (opts.only || []).map(String);
+  const excludeRaw = (opts.exclude || []).map(String);
+  const only = onlyRaw.map((s) => s.toLowerCase());
+  const exclude = excludeRaw.map((s) => s.toLowerCase());
 
   if (!fs.existsSync(inputDir)) {
     throw new Error(`Brak katalogu wejściowego: ${inputDir}\nPobierz pack z itch.io i rozpakuj tu wariant Small 128x64.`);
@@ -346,7 +381,7 @@ export function importIsotilePack(opts = {}) {
       const name = `${s.kind}_${String(s.index).padStart(2, '0')}.png`;
       fs.writeFileSync(path.join(outputDir, name), PNG.sync.write(s.png));
     }
-    writeNotice(outputDir, { inputDir, perMaterial, picks, only, exclude, selected: selected.length, report, unmappedMaterials, totalTiles, skipped });
+    writeNotice(outputDir, { inputDir, perMaterial, picks, only: onlyRaw, exclude: excludeRaw, selected: selected.length, report, unmappedMaterials, totalTiles, skipped });
   }
 
   return {
@@ -379,7 +414,7 @@ function writeNotice(outputDir, info) {
     ('node tools/import-isotilepack.mjs --per-material ' + (info.perMaterial ?? 4)
       + (info.only && info.only.length ? info.only.map((s) => ` --only "${s}"`).join('') : '')
       + (info.exclude && info.exclude.length ? info.exclude.map((s) => ` --exclude "${s}"`).join('') : '')
-      + Object.entries(info.picks || {}).map(([k, v]) => ` --pick ${k}=${v.join(',')}`).join('')),
+      + Object.entries(info.picks || {}).map(([k, v]) => ` --pick ${k}=${formatPickNumbers(v)}`).join('')),
     'npm run pipeline:pack',
     '```',
     '',
@@ -426,7 +461,7 @@ function parseArgs(argv) {
         console.error('[IMPORT] --pick wymaga formatu rodzaj=1,2,3, np. --pick grass=1,5,9');
         process.exit(1);
       }
-      opts.picks[kind.trim()] = nums.split(',').map((s) => Number(s));
+      opts.picks[kind.trim()] = parsePickNumbers(nums);
     } else if (a === '--map') {
       for (const pair of String(argv[++i]).split(',')) {
         const [k, v] = pair.split('=');
@@ -440,7 +475,7 @@ function parseArgs(argv) {
   --exclude <fragment>  pomiń ścieżki zawierające fragment (można powtarzać)
   --per-material <n>    ile kafli na rodzaj (domyślnie 4, 0 = wszystkie)
   --all                 skrót na --per-material 0
-  --pick <rodzaj=i,j>   ręczny wybór kafli po numerach (1-based); powtarzalne
+  --pick <rodzaj=i,j-l> ręczny wybór kafli po numerach (1-based, zakresy); powtarzalne
   --preview <plik.png>  kontaktówka wybranych kafli (ocena przed pipeline'em)
   --preview-cols <n>    ogranicz liczbę kolumn kontaktówki (eksploracja)
   --list <plik.txt>     katalog kandydatów z numerami (do --pick)

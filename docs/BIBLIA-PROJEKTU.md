@@ -128,6 +128,12 @@ Jedno źródło: `assets/source_tiles/*.png` (128 px). Wszystko dalej jest produ
 
 Całość: **`npm run pipeline`**. Uwaga z reguły 9: krok 7 nadpisuje eksporty.
 
+Kroki 1–3 **sprzątają osierocone pliki** w katalogach wynikowych
+(`tools/tile-dir-utils.mjs`): gdy zmieni się źródło (np. z proceduralnego
+`assets/source_tiles` na `assets/source_pack`), stary kafel nie zostaje
+w `tiles_*` ani w atlasie. Bez tego atlas puchł o szczątki poprzedniego źródła.
+Sprzątanie jest pomijane przy pracy w miejscu (`in == out`).
+
 ### 4a. Zewnętrzny pack CC0 (opcjonalne źródło)
 
 Zamiast ręcznie robionych `assets/source_tiles/*.png` można użyć packa
@@ -164,25 +170,37 @@ npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE doc
   | Grass, Flora | `grass` | |
   | Dry | `dirt` | |
   | Rocky, Stones | `gravel` | |
-  | Metal, Stone | `concrete` | |
+  | Metal, Grill, Grate | `concrete` | kratki i ryfle = podłoga przemysłowa |
+  | Stone | `asphalt` | **do oceny**: płyty kamienne czytają się jak piaskowiec, nie jezdnia |
   | Wood | `wood` | |
   | Tile | `tile` | ceramika |
   | Pattern | `carpet` | w tym packu to wzorzyste wykładziny |
-  | Brick | `sidewalk` | bruk/płytki |
-  | Elements | `water` | tylko kafle wodne — wybierz `--pick water=1..18` |
-  | Grill | `asphalt` | **dyskusyjne**: to kratki/ryfle metalowe, nie asfalt |
+  | Brick | `sidewalk` | bruk/płytki, kilka kolorów |
+  | Elements | `water` | tylko woda: `--pick water=1-18` (`Elements_01`) |
   | Ice | — | pomijane (brak rodzaju w `GROUND_SPEC`) |
 
   Nadpisanie: `--map grill=concrete,ice=skip`.
 - **Kuracja**: domyślnie **4 kafle na rodzaj** równomiernie z całego zbioru;
   `--per-material N`, `--all` (wszystko). Ręczny wybór: `--pick grass=1,5,9`
-  (numery 1-based z `--list`), a `--preview <plik.png>` rysuje kontaktówkę
-  wybranych kafli (także z `--dry-run`), `--preview-cols N` ją zawęża.
+  albo zakres `--pick water=1-18` (numery 1-based z `--list`), a
+  `--preview <plik.png>` rysuje kontaktówkę wybranych kafli (także z
+  `--dry-run`), `--preview-cols N` ją zawęża.
 - `assets/source_pack/NOTICE.md` dokumentuje CC0, źródło i **komendę odtworzenia**
   (z filtrami i `--pick`). **Surowy pack nie jest commitowany** (`.gitignore`);
   do repo wchodzi skuratorowany `assets/source_pack/` (mały, czyni pipeline
   odtwarzalnym) oraz pochodne atlasy.
-- Test importera: `npm run test:pack` (21/21, nie wymaga packa — buduje
+- Sprawdzona komenda dla tego archiwum (daje 90 kafli, 10/10 rodzajów):
+
+  ```bash
+  node tools/import-isotilepack.mjs --only "Floor Tiles" --per-material 8 \
+      --pick water=1-18 --preview shots/pack-final.png --list shots/pack-candidates.txt
+  npm run pipeline:pack:full     # 90 kafli w atlasie; NADPISUJE docs/amiga/**
+  ```
+
+  Kolejność kafli w atlasie jest alfabetyczna po nazwie rodzaju: asphalt 0–7,
+  carpet 8–15, concrete 16–23, dirt 24–31, grass 32–39, gravel 40–47,
+  sidewalk 48–55, tile 56–63, water 64–81, wood 82–89.
+- Test importera: `npm run test:pack` (24/24, nie wymaga packa — buduje
   syntetyczne arkusze z fixture'ów `assets/source/isotilepack/demo/`).
 - `png_mini.js` obsługuje też PNG indeksowane (colorType 3, 1/2/4/8 bitów,
   `PLTE` + `tRNS`), bo packi na itch.io często takie są. 16-bit i interlace
@@ -221,7 +239,7 @@ npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 | `tools/stress.mjs` | 6000 klatek bez błędu |
 | `tools/test-modular-system.mjs` | **65/65 OK** |
 | `tools/isometric/test.mjs` | `isometric pipeline tests passed` |
-| `tools/test-isotilepack-import.mjs` | **21/21 OK** (import packa, filtry, geometria 2:1, `--pick`, kontaktówka, łańcuch skalowania) |
+| `tools/test-isotilepack-import.mjs` | **24/24 OK** (import packa, filtry, geometria 2:1, `--pick`, kontaktówka, łańcuch skalowania) |
 
 ### Pułapka: `build/` nie jest w gicie
 
@@ -325,7 +343,7 @@ cd AmBoid
 git checkout main            # albo gałąź zadania
 npm install
 node tools/build_adf.mjs     # obejście braku build/ (placeholdery)
-npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 21/21
+npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 24/24
 ```
 
 Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
@@ -348,6 +366,10 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | 2026-10-19 | Importer zapisuje do `assets/source_pack`, nie nadpisuje `assets/source_tiles` | oba źródła (proceduralne i pack) pozostają odtwarzalne |
 | 2026-10-19 | Surowy pack **nie jest commitowany**; w repo skuratorowany `assets/source_pack` + `NOTICE.md` i pochodne atlasy | rozmiar + polityka repo (CC0 pozwala na więcej, ale nie ma potrzeby) |
 | 2026-10-19 | Amiberry 8.3.0 + WHDLoad w systemie = środowisko testów Amigi | użytkownik potwierdził konfigurację; używać przy `docs/WHDLOAD.md` |
+| 2026-10-19 | Importer ma **filtry ścieżek** (`--only`/`--exclude`) i **bramkę 2:1** | jedno archiwum SBS zawiera 3 packi (podłogi, overworld, ściany 64×96); bez tego ściany trafiały na podłogi |
+| 2026-10-19 | `Pattern → carpet`, `Grill → concrete`, `Stone → asphalt` | pack daje 10/10 rodzajów; kratki metalowe to podłoga przemysłowa; kamień jako jezdnia **wymaga jeszcze oceny** (wygląda jak piaskowiec) |
+| 2026-10-19 | Kroki 1–3 pipeline'u **sprzątają osierocone kafle** (`tools/tile-dir-utils.mjs`) | przy zmianie źródła stary `path_01`/`stone_01` zostawał w `tiles_*` i atlasie (92 zamiast 90 kafli) |
+| 2026-10-19 | `--pick` przyjmuje zakresy (`water=1-18`) | wybór wody bez wypisywania 18 numerów |
 
 ---
 
@@ -393,5 +415,7 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | **blitScaled** | skalowanie indeksów palety filtrem MAJORITY 2×2 |
 | **fixture** | zacommitowane dane demo z PR #5 (64×32), niezależne od pipeline'u |
 | **pack CC0** | zewnętrzny zestaw kafli SBS 128×64; wejście importera (§4a) |
-| **kuracja** | wybór N kafli na rodzaj (`--per-material`), domyślnie 4 |
+| **kuracja** | wybór kafli na rodzaj: `--per-material N` (domyślnie 4) albo ręcznie `--pick` |
+| **bramka 2:1** | odrzucanie kafli, gdzie `tileW ≠ 2 × tileH` (ściany 64×96, „thick” 128×72) |
+| **osierocony kafel** | plik w `clean_128`/`tiles_*`/`quantized_64`, którego nie ma już w źródle; kroki 1–3 go usuwają |
 | **WHDLoad** | loader gier z HDD/CF; docelowa forma dystrybucji (patrz `docs/WHDLOAD.md`) |

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from './png_mini.js';
+import { pruneStaleTiles, logPruned } from './tile-dir-utils.mjs';
 import { PALETTE, PALETTE_EXT, hexToRgb, TRANSPARENT } from '../src/palette.js';
 
 // Przygotowanie tablic kolorów RGB dla bazowej palety 32 i AGA 64
@@ -69,6 +70,10 @@ export function quantizeDirectory(inDir, outDir, profile = 'aga') {
   fs.mkdirSync(outDir, { recursive: true });
   const files = fs.readdirSync(inDir).filter((f) => f.toLowerCase().endsWith('.png'));
   console.log(`[QUANTIZE-PALETTE] Kwantyzacja ${files.length} plików do profilu ${profile.toUpperCase()}...`);
+
+  if (path.resolve(inDir) !== path.resolve(outDir)) {
+    logPruned('QUANTIZE-PALETTE', pruneStaleTiles(outDir, files));
+  }
 
   for (const f of files) {
     const inPath = path.join(inDir, f);

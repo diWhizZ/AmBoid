@@ -6,7 +6,7 @@ Stan na **2026-10-19**:
 - tagi i Release: `v0.2.4`, `v0.2.5`,
 - gałąź bieżąca: `feat/import-isotilepack` (import packa CC0),
 - bramka: `npm test` = **215 OK / 0 FAIL**, modular **65/65**, iso **passed**,
-  pack **21/21**,
+  pack **24/24**,
 - kontekst projektu: [`docs/BIBLIA-PROJEKTU.md`](BIBLIA-PROJEKTU.md),
 - dystrybucja: [`docs/WHDLOAD.md`](WHDLOAD.md).
 
@@ -35,15 +35,22 @@ Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
       (`--per-material`, domyślnie 4), filtry ścieżek (`--only`/`--exclude`),
       twarda bramka geometrii 2:1, ręczny wybór (`--pick`), kontaktówka
       (`--preview`), katalog kandydatów (`--list`), `NOTICE.md` (CC0)
-- [x] `tools/test-isotilepack-import.mjs` — 21/21 (m.in. PNG indeksowany,
-      determinizm, filtry, bramka 2:1, `--pick`, kontaktówka, łańcuch
-      clean→resize→quantize); wpięty w `npm test`
+- [x] `tools/test-isotilepack-import.mjs` — 24/24 (m.in. PNG indeksowany,
+      determinizm, filtry, bramka 2:1, `--pick` + zakresy, kontaktówka, katalog
+      kandydatów, sprzątanie osieroconych plików, łańcuch clean→resize→quantize);
+      wpięty w `npm test`
 - [x] `png_mini.js`: obsługa PNG indeksowanych (PLTE + tRNS, 1/2/4/8 bitów)
 - [x] Skrypty `import-pack`, `pipeline:pack`, `pipeline:pack:full`, `test:pack`
 - [x] `.gitignore`: surowy pack poza repo
+- [x] `tools/tile-dir-utils.mjs`: kroki 1–3 usuwają osierocone kafle z
+      `clean_128`/`tiles_*`/`quantized_64` (bez tego atlas puchł o szczątki
+      poprzedniego źródła — realnie `path_01`, `stone_01` → 92 zamiast 90 kafli)
 - [x] Weryfikacja na realnym packu: Floor Pack = 28 arkuszy / 504 kafle;
       pokrycie 10/10 rodzajów (po przemapowaniu `Pattern → carpet`); ściany
       i overworld odsiane bramką 2:1 (47 plików)
+- [x] Odtworzony atlas Amigi z packa: 90 kafli (asphalt 0–7, carpet 8–15,
+      concrete 16–23, dirt 24–31, grass 32–39, gravel 40–47, sidewalk 48–55,
+      tile 56–63, water 64–81, wood 82–89); ocena wizualna w `shots/`
 
 ## Etap 4 — następna wersja (grafika rozgrywki)
 
@@ -81,19 +88,36 @@ Rezultat weryfikacji na realnym packu (2026-10-19):
 
 - Floor Pack daje **wszystkie 10 rodzajów**; `Pattern` przemapowane na `carpet`,
   więc `carpet` ma wreszcie źródło plikowe.
-- **`asphalt` ← `Grill`** to najsłabsze ogniwo: to kratki i ryfle metalowe
-  (industriale), nie jezdnia. Do decyzji: albo zaakceptować, albo dać
-  `Grill → concrete` i zostawić `asphalt` proceduralny/narysować osobno.
+- **`Grill → concrete`** (decyzja): kratki i ryfle metalowe to podłoga
+  przemysłowa, nie jezdnia.
+- **`asphalt` ← `Stone`** (decyzja „użyj czegoś z kamienia”) — **wymaga jeszcze
+  oceny**: płyty kamienne po kwantyzacji czytają się jak jasny piaskowiec, nie
+  jezdnia (`shots/atlas-vs-source.png`). Opcje: `--pick asphalt=<ciemne płyty>`,
+  powrót do `Grill → asphalt`, albo dorysowanie własnych kafli jezdni.
 - **`water` ← `Elements`**: arkusz `Elements_01` to woda, `Elements_02` to
-  bagno/mul — wybierać ręcznie (`--pick water=1..18`).
+  bagno/mul — wybrane ręcznie: `--pick water=1-18`.
 - **`ice`** pomijane (brak rodzaju); `Wall Pack` (64×96, 72×100) to materiał na
   osobny etap ścian, nie na ten importer.
-- Artefakty do oceny (gitignored `shots/`): `shots/pack-preview-08.png`,
-  `shots/pack-all-18.png`, `shots/pack-candidates.txt`, `shots/compare-kinds.png`.
+- Odtworzony atlas Amigi ma 90 kafli; ocena wizualna: `shots/pack-final.png`
+  (źródła), `shots/atlas-vs-source.png` (źródło vs komórka atlasu),
+  `shots/compare-kinds.png` (materiały packa), `shots/pack-candidates.txt`
+  (numery do `--pick`).
 
-Rekomendacja: najpierw doprowadzić pack do atlasów Amigi i ocenić je wizualnie
-(Amiberry 8.3.0 jest w systemie), dopiero potem decydować o przeglądarce. Nie
-zmieniać `tilesets.json`, dopóki atlasy nie są zamrożone.
+Zanim pack stanie się grafiką gry, trzeba jeszcze:
+
+1. zamrozić `--pick` dla `asphalt` i `water` (i ewentualnie liczbę wariantów),
+2. przeliczyć `data/tilesets.json`: po przejściu na pack wiszą odwołania
+   `tile/stone_01` i `tile/path_01` (zniknęły), a `tile/lava_01` i
+   `tile/panel_blinking` nigdy nie miały plików — nazwy podłóg w packu to
+   `<rodzaj>_<nn>`,
+3. zdecydować o przeglądarce: `makeGroundTiles` proceduralnie vs `?art=pack`,
+4. świadomie zacommitować produkty (`assets/clean_128|tiles_*|quantized_64`,
+   `docs/amiga/**`) razem ze zmianą źródła — dziś są w drzewie roboczym
+   przywrócone do wersji proceduralnej.
+
+Rekomendacja: ocenić atlasy (Amiberry 8.3.0 jest w systemie), dopiero potem
+decydować o przeglądarce. Nie zmieniać `tilesets.json`, dopóki atlasy nie są
+zamrożone.
 
 ## Etap 5 — NPC (osobny etap, po 4)
 

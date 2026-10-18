@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from './png_mini.js';
+import { pruneStaleTiles, logPruned } from './tile-dir-utils.mjs';
 
 export function scaleNearestNeighbor(srcPng, targetW, targetH) {
   const dstPng = new PNG({ width: targetW, height: targetH });
@@ -36,6 +37,13 @@ export function resizeTilesBatch(inputDir, outputDir64, outputDir32) {
 
   const files = fs.readdirSync(inputDir).filter((f) => f.toLowerCase().endsWith('.png'));
   console.log(`[RESIZE-TILES] Przetwarzanie ${files.length} plików...`);
+
+  // Kafle usunięte ze źródła nie mogą zostać w tiles_64/tiles_32.
+  for (const dir of [outputDir64, outputDir32]) {
+    if (path.resolve(dir) !== path.resolve(inputDir)) {
+      logPruned('RESIZE-TILES', pruneStaleTiles(dir, files), dir);
+    }
+  }
 
   for (const f of files) {
     const inPath = path.join(inputDir, f);
