@@ -3,6 +3,10 @@
 Ten plik czyta każdy agent (opencode i inne) przed pierwszą zmianą w repo.
 Trzymaj go krótko i aktualizuj razem z kodem.
 
+**Pełny kontekst** (środowiska, decyzje, pułapki, wznowienie pracy gdzie indziej):
+[`docs/BIBLIA-PROJEKTU.md`](docs/BIBLIA-PROJEKTU.md). Docelowa dystrybucja
+Amigi: [`docs/WHDLOAD.md`](docs/WHDLOAD.md).
+
 ## Czym jest projekt
 
 Izometryczny survival zombie inspirowany Project Zomboid, zaprojektowany pod
@@ -18,8 +22,9 @@ a `amiga/` to natywny port w C/assemblerze (render, Paula, custom input, Makefil
 
 ```bash
 npm start              # serwer podglądu, tools/serve.mjs, http://localhost:8080 (PORT nadpisuje)
-npm test               # PEŁNY zestaw: gametest + browsertest + browsertest --view=close + stress + test-modular-system
+npm test               # PEŁNY zestaw: gametest + browsertest + browsertest --view=close + stress + test-modular-system + isometric/test
 npm run test:modular   # tylko testy modułów i zgodności z eksportem Amigi (65/65)
+npm run test:iso       # tylko silnik izometryczny z PR #5 (map-demo.html)
 npm run pipeline       # clean-magenta -> resize-tiles -> quantize-palette -> build-atlas -> convert-tiled-map -> export-items -> export-amiga
 npm run validate-assets
 npm run shots          # zrzuty do docs/screens (w repo, x2 nearest neighbour) — odświeżaj przy zmianach grafiki
@@ -58,6 +63,10 @@ w każdym zadaniu graficznym:
 - **`tools/export_amiga.mjs` nie jest uruchamiany mimochodem** — nadpisuje
   zapisane eksporty `docs/amiga/**`. Uruchamiaj tylko świadomie, w zadaniu
   „odświeżenie eksportu”, i wtedy commit razem z regeneratami.
+- **Dwa niezależne światy graficzne.** Gra używa kafli 32×16 (320×200). Demonstrator
+  z PR #5 (`map-demo.html`, `src/engine/`, `assets/atlases/floor-64.png`,
+  `maps/tiled/demo.json`, `tools/isometric/*`) ma własne fixture 64×32 i własny
+  test. Nie mieszaj ich i nie „ujednolicaj” przy okazji — to świadoma separacja.
 
 ## Struktura
 
@@ -70,7 +79,7 @@ w każdym zadaniu graficznym:
 | `tools/` | serwer, testy, pipeline assetów, eksport IFF/AMB, ADF |
 | `assets/` | `source_tiles` (źródła) → `clean_128` → `tiles_64`/`tiles_32` → `quantized_64`; wszystko poza źródłami jest produktem pipeline'u |
 | `data/` | `items.json`, `tilesets.json`, `maps/*` (Tiled → `sample_map.amb`) |
-| `docs/` | `GDD.md`, `AMIGA.md`, `GRAFIKA.md`, `WINDOWS.md`, `PUBLIKACJA.md`, `ROADMAP.md`, `PROMPT-KONTYNUACJA.md`, `prompts/`, `screens/`, `amiga/**` (eksporty — generowane) |
+| `docs/` | `BIBLIA-PROJEKTU.md`, `ROADMAP.md`, `WHDLOAD.md`, `AMIGA.md`, `GDD.md`, `GRAFIKA.md`, `WINDOWS.md`, `PUBLIKACJA.md`, `ISOMETRIC.md`, `PROMPT-KONTYNUACJA.md`, `prompts/`, `screens/`, `amiga/**` (eksporty — generowane) |
 | `build/` | **nie w repo** (`.gitignore`) — `build/amiga/*.adf` i paczka AmigaOS są assetem Release |
 
 ## Testy i jakość
@@ -80,7 +89,9 @@ w każdym zadaniu graficznym:
 - Nową regułę mechaniczną dodawaj do `tools/gametest.mjs`, a regułę dotyczącą
   modułów/eksportu do `tools/test-modular-system.mjs`.
 - Test na ADF-y czyta `build/amiga/`; jeśli katalogu nie ma, uruchom
-  `node tools/build_adf.mjs`, nie commituj ADF-ów.
+  `node tools/build_adf.mjs`, nie commituj ADF-ów. **To placeholdery** — zielony
+  test nie znaczy, że build Amigi działa. Docelowa dystrybucja to HDD/WHDLoad
+  (`docs/WHDLOAD.md`), ADF zostaje deweloperski.
 
 ## Git, PR, Release — workflow projektu
 
