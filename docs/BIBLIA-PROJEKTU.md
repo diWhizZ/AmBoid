@@ -13,8 +13,8 @@ Czytaj w tej kolejności:
 5. [`docs/AMIGA.md`](AMIGA.md) — plan sprzętowy Amigi (AGA/RTG/OCS);
 6. [`docs/WHDLOAD.md`](WHDLOAD.md) — docelowa forma dystrybucji.
 
-> Stan dokumentu: **2026-10-18**, gałąź `feat/amiga-port-i-pipeline`
-> (po rebase na `main@361139f`).
+> Stan dokumentu: **2026-10-19**, `main@38d013a` (PR #6 scalony).
+> Praca nad assetami: gałąź `feat/import-isotilepack`.
 
 ---
 
@@ -128,11 +128,44 @@ Jedno źródło: `assets/source_tiles/*.png` (128 px). Wszystko dalej jest produ
 
 Całość: **`npm run pipeline`**. Uwaga z reguły 9: krok 7 nadpisuje eksporty.
 
+### 4a. Zewnętrzny pack CC0 (opcjonalne źródło)
+
+Zamiast ręcznie robionych `assets/source_tiles/*.png` można użyć packa
+**Isometric Tiles — Floor Pack** (Screaming Brain Studios, **CC0 1.0**,
+<https://screamingbrainstudios.itch.io/isotilepack>). Wariant **Small 128×64**
+jest jedynym dozwolonym; Large 256×128 nie wchodzi do tego pipeline'u.
+
+```bash
+# 1. rozpakuj pack do assets/source/isotilepack/ (katalog jest w .gitignore,
+#    poza zacommitowanymi fixture'ami demo/)
+npm run import-pack -- --dry-run     # raport: ile kafli, jakie materiały
+npm run import-pack                  # -> assets/source_pack/<rodzaj>_<nn>.png + NOTICE.md
+npm run pipeline:pack                # clean-magenta -> resize -> quantize (nadpisuje assets/clean_128 itd.)
+npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE docs/amiga/**)
+```
+
+- Importer (`tools/import-isotilepack.mjs`) sam tnie arkusze, wykrywa rozmiar
+  kafla z nazwy pliku (`128x64`), składa płaski katalog i deduplikuje piksele.
+- Mapowanie materiałów packa na `GROUND_SPEC` jest w `DEFAULT_MATERIAL_MAP`
+  (np. `dry → dirt`, `stone → concrete`, `brick → sidewalk`, `ice → skip`).
+  Nadpisanie: `--map brick=tile,ice=skip`.
+- Domyślnie bierze **4 kafle na rodzaj** (kuracja, wariant „D”), równomiernie
+  z całego zbioru; `--all` bierze wszystko. `--per-material N` zmienia limit.
+- `assets/source_pack/NOTICE.md` dokumentuje CC0 i źródło. **Surowy pack nie jest
+  commitowany** (`.gitignore`); do repo wchodzi skuratorowany `assets/source_pack/`
+  (mały, czyni pipeline odtwarzalnym) oraz pochodne atlasy.
+- Test importera: `npm run test:pack` (12/12, nie wymaga packa — buduje
+  syntetyczne arkusze z fixture'ów `assets/source/isotilepack/demo/`).
+- `png_mini.js` obsługuje też PNG indeksowane (colorType 3, 1/2/4/8 bitów,
+  `PLTE` + `tRNS`), bo packi na itch.io często takie są. 16-bit i interlace
+  są jawnie odrzucane.
+
 Dodatkowy, **niezależny** demonstrator z PR #5 (`map-demo.html`) ma własne,
 zacommitowane fixture 64×32: `maps/tiled/demo.json`, `assets/atlases/floor-64.png`,
-`assets/source/isotilepack/`, `src/engine/`. **Nie jest częścią pipeline'u** i nie
+`assets/source/isotilepack/demo/`, `src/engine/`. **Nie jest częścią pipeline'u** i nie
 należy go z nim mieszać. Jego narzędzia (`tools/isometric/*`) są testowane przez
-`tools/isometric/test.mjs`.
+`tools/isometric/test.mjs`. Sam katalog `assets/source/isotilepack/` (poza `demo/`)
+służy jako miejsce rozpakowania packa CC0 dla importera z §4a.
 
 ---
 
@@ -143,6 +176,7 @@ npm install          # jedyna zależność: pngjs
 npm test             # pełna bramka jakości
 npm run test:modular # tylko moduły + zgodność z eksportem Amigi
 npm run test:iso     # tylko silnik izometryczny z PR #5
+npm run test:pack    # tylko import packa CC0 + clean/resize/quantize
 npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 ```
 
@@ -155,6 +189,7 @@ npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 | `tools/stress.mjs` | 6000 klatek bez błędu |
 | `tools/test-modular-system.mjs` | **65/65 OK** |
 | `tools/isometric/test.mjs` | `isometric pipeline tests passed` |
+| `tools/test-isotilepack-import.mjs` | **12/12 OK** (import packa + łańcuch skalowania) |
 
 ### Pułapka: `build/` nie jest w gicie
 
@@ -237,6 +272,11 @@ Historia scalonych PR-ów:
   — stamtąd zaimportowano pracę, której nie było w gicie. **Nie jest źródłem prawdy.**
 - OpenCode V2: sesje w `~/.local/share/opencode/opencode.db`; sesja nie przenosi
   się między maszynami — dlatego istnieje ten dokument.
+- Emulacja Amigi: **Amiberry 8.3.0** (`/usr/bin/amiberry`, konfiguracja
+  `~/.config/amiberry/amiberry.ini`), ROM-y w `~/Amiberry/ROMs` (m.in. KS 3.1
+  A1200/A600), WHDLoad + `whdboot` w `/usr/share/amiberry/whdboot/`. Środowisko
+  gotowe do ręcznych testów WHDLoad (`docs/WHDLOAD.md`); nie jest częścią
+  `npm test` i nie ma jeszcze automatyzacji uruchamiania gier.
 
 ### 8.2 Maszyna z Windows
 
@@ -253,7 +293,7 @@ cd AmBoid
 git checkout main            # albo gałąź zadania
 npm install
 node tools/build_adf.mjs     # obejście braku build/ (placeholdery)
-npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed
+npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 12/12
 ```
 
 Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
@@ -271,6 +311,11 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | 2026-10-18 | `package.json`: nasze skrypty + `test:iso`; `test` uruchamia **oba** testy | naiwne „weź nasze” wyłączyłoby test silnika z #5 |
 | 2026-10-18 | Aliasy `assets:*`, `map:convert`, `amiga:export` z #5 usunięte | nasze narzędzia mają inne sygnatury — aliasy kłamałyby |
 | 2026-10-18 | **WHDLoad = docelowy nośnik**, ADF = artefakt deweloperski | `docs/AMIGA.md` §3; dyskietka nie jest ograniczeniem |
+| 2026-10-19 | PR #6 scalony (`main@38d013a`); dalsza praca na `feat/import-isotilepack` | domknięcie portu/pipeline'u przed grafiką |
+| 2026-10-19 | Źródło grafiki podłóg: pack CC0 SBS, wariant **Small 128×64**, kuratorowany podzbiór | darmowy, komercyjny, 2:1 izometria zgodna z 32×16 po skalowaniu |
+| 2026-10-19 | Importer zapisuje do `assets/source_pack`, nie nadpisuje `assets/source_tiles` | oba źródła (proceduralne i pack) pozostają odtwarzalne |
+| 2026-10-19 | Surowy pack **nie jest commitowany**; w repo skuratorowany `assets/source_pack` + `NOTICE.md` i pochodne atlasy | rozmiar + polityka repo (CC0 pozwala na więcej, ale nie ma potrzeby) |
+| 2026-10-19 | Amiberry 8.3.0 + WHDLoad w systemie = środowisko testów Amigi | użytkownik potwierdził konfigurację; używać przy `docs/WHDLOAD.md` |
 
 ---
 
@@ -315,4 +360,6 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | **`tileDim`** | funkcja przygaszania kafla (kolejność: RTG → dzień → pamięć → światła) |
 | **blitScaled** | skalowanie indeksów palety filtrem MAJORITY 2×2 |
 | **fixture** | zacommitowane dane demo z PR #5 (64×32), niezależne od pipeline'u |
+| **pack CC0** | zewnętrzny zestaw kafli SBS 128×64; wejście importera (§4a) |
+| **kuracja** | wybór N kafli na rodzaj (`--per-material`), domyślnie 4 |
 | **WHDLoad** | loader gier z HDD/CF; docelowa forma dystrybucji (patrz `docs/WHDLOAD.md`) |

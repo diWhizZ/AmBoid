@@ -1,17 +1,18 @@
 # AMBOID — roadmapa i dług techniczny
 
-Stan na **2026-10-18**:
+Stan na **2026-10-19**:
 
-- `main` = `361139f` (PR #5 scalony: pipeline izometryczny 64×32 + demo Canvas),
+- `main` = `38d013a` (**PR #6 scalony**: port Amigi + pipeline + moduły),
 - tagi i Release: `v0.2.4`, `v0.2.5`,
-- gałąź `feat/amiga-port-i-pipeline` (PR #6) — **po rebase na `main`**,
-  0 konfliktów, `npm test` zielony,
+- gałąź bieżąca: `feat/import-isotilepack` (import packa CC0),
+- bramka: `npm test` = **215 OK / 0 FAIL**, modular **65/65**, iso **passed**,
+  pack **12/12**,
 - kontekst projektu: [`docs/BIBLIA-PROJEKTU.md`](BIBLIA-PROJEKTU.md),
 - dystrybucja: [`docs/WHDLOAD.md`](WHDLOAD.md).
 
 Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
 
-## Zrobione (w tej gałęzi, poza `main`)
+## Zrobione (na `main`)
 
 - [x] Port natywny w C/asm: `amiga/` — render AGA/OCS/RTG, Paula, custom input,
       AmigaOS, Makefile. **Uwaga: szkielet, nie działająca gra.**
@@ -25,6 +26,18 @@ Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
 - [x] **`docs/BIBLIA-PROJEKTU.md`** — kontekst przenośny między środowiskami
 - [x] **`docs/WHDLOAD.md`** — plan docelowej dystrybucji
 - [x] Instrukcje w README: dodanie tekstury, przedmiotu i mapy (Tiled → AMB2)
+- [x] **PR #6 scalony** do `main` (`38d013a`)
+
+## Zrobione na `feat/import-isotilepack` (do scalenia)
+
+- [x] `tools/import-isotilepack.mjs` — cięcie arkuszy 128×64, detekcja materiału
+      z nazw plików/folderów, mapa na `GROUND_SPEC`, deduplikacja, kuracja
+      (`--per-material`, domyślnie 4), `NOTICE.md` (CC0)
+- [x] `tools/test-isotilepack-import.mjs` — 12/12 (m.in. PNG indeksowany,
+      determinizm, łańcuch clean→resize→quantize); wpięty w `npm test`
+- [x] `png_mini.js`: obsługa PNG indeksowanych (PLTE + tRNS, 1/2/4/8 bitów)
+- [x] Skrypty `import-pack`, `pipeline:pack`, `pipeline:pack:full`, `test:pack`
+- [x] `.gitignore`: surowy pack poza repo
 
 ## Etap 4 — następna wersja (grafika rozgrywki)
 
@@ -34,6 +47,9 @@ i mirroring boków. Efekty limitowane (krew, łuski, dym, błysk wystrzału, śl
 stóp) — nigdy nie rosnące bez końca. Portret i pasek stanu dopracowane w 320×200.
 
 - [ ] Ikony ekwipunku i łupów z jednej podpalety 16 kolorów (`docs/amiga/`, `src/art.js`)
+- [ ] **Podłogi z packa CC0** (ścieżka „D + A”): pobrać Small 128×64 →
+      `npm run import-pack` → `npm run pipeline:pack` → obejrzeć atlasy i podjąć
+      decyzję o scaleniu z grą (patrz niżej)
 - [ ] Animacje 2–4 klatkowe + mirroring boków dla postaci i rekwizytów
 - [ ] Efekty z twardym limitem instancji (krew, łuski, dym, błysk, ślady stóp)
 - [ ] Portret gracza + pasek stanu w 320×200
@@ -43,6 +59,21 @@ stóp) — nigdy nie rosnące bez końca. Portret i pasek stanu dopracowane w 32
 
 Uwaga: geometria kafla (`TILE_W/TILE_H/WALL_H`, dziś 32/16/20) pozostaje spójna
 między `src/render.js` a `src/art.js`. `255` = przezroczystość.
+
+### Grafika podłóg z packa CC0 — otwarta decyzja
+
+Importer i łańcuch do atlasów działają (`docs/BIBLIA-PROJEKTU.md` §4a). Do
+rozstrzygnięcia zostaje **jak pack trafia do gry**:
+
+- **wariant proceduralny (dziś):** `makeGroundTiles` w `src/art.js` rysuje 10
+  rodzajów podłóg z `GROUND_SPEC`; zero plików, warianty liczone deterministycznie;
+- **wariant „pack”:** atlasy z packa zastępują proceduralne podłogi — wymaga
+  przeładowania `data/tilesets.json` (współrzędne atlasów!) i decyzji, czy
+  trzymać flagę `?art=pack`, czy przełączyć na stałe.
+
+Rekomendacja: najpierw doprowadzić pack do atlasów Amigi i ocenić je wizualnie
+(Amiberry 8.3.0 jest w systemie), dopiero potem decydować o przeglądarce. Nie
+zmieniać `tilesets.json`, dopóki atlasy nie są zamrożone.
 
 ## Etap 5 — NPC (osobny etap, po 4)
 
@@ -59,7 +90,9 @@ Szczegóły i wymagania techniczne: [`docs/WHDLOAD.md`](WHDLOAD.md).
 - [ ] `make whdload` — hunk-exe 68020 ze ścieżki AGA (`render_aga.c`)
 - [ ] `tools/build_whdload.mjs` — realne pakowanie (zastępuje placeholder ADF)
 - [ ] `Install`, `ReadMe`, `AmBoid.inf`
-- [ ] Test w emulatorze (A1200/68030/8 MB fast, KS 3.1 + WHDLoad)
+- [ ] Test w emulatorze (A1200/68030/8 MB fast, KS 3.1 + WHDLoad) — **Amiberry
+      8.3.0 z WHDLoad jest już skonfigurowany w systemie deweloperskim**
+      (`docs/BIBLIA-PROJEKTU.md` §8.1)
 - [ ] Release z assetem `AmBoid-<wersja>-whd.zip`
 
 ADF przestaje być domyślnym artefaktem — zostaje trybem zgodności/deweloperski.
@@ -97,7 +130,7 @@ ADF przestaje być domyślnym artefaktem — zostaje trybem zgodności/deweloper
 ## Proces (obowiązuje w każdym zadaniu)
 
 1. Gałąź zadania (`arena/<id>-amboid` albo `feat/<temat>`), nigdy praca wprost na `main`.
-2. Zmiana + `npm test` (215 OK / 0 FAIL, modular 65/65, iso passed).
+2. Zmiana + `npm test` (215 OK / 0 FAIL, modular 65/65, iso passed, pack 12/12).
 3. PR do `main`, opis przez `gh api --method PATCH ... -f body=...`.
 4. Jawny merge: `gh pr merge <nr> --merge`.
 5. Tag + Release z tego samego commitu; ZIP źródeł jako asset Release.
