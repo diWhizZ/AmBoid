@@ -6,7 +6,7 @@
 //   docs/amiga/**/*.png       — podgląd atlasów i palet
 import fs from 'node:fs';
 import path from 'node:path';
-import { PNG } from 'pngjs';
+import { PNG } from './png_mini.js';
 import { buildArt } from '../src/art.js';
 import { PALETTE, PALETTE_EXT, TRANSPARENT, hexToRgb } from '../src/palette.js';
 import { writeILBM, writePalette } from './iff.js';

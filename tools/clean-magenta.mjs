@@ -1,4 +1,56 @@
-import fs from 'node:fs'; import path from 'node:path'; import { PNG } from 'pngjs';
-const input=process.argv[2]||'assets/source/isotilepack'; const output=process.argv[3]||'assets/tiles/cleaned';
-function walk(d){return fs.existsSync(d)?fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(d,e.name)):[path.join(d,e.name)]):[];}
-let n=0; for(const f of walk(input).filter(f=>f.toLowerCase().endsWith('.png'))){const rel=path.relative(input,f), out=path.join(output,rel);fs.mkdirSync(path.dirname(out),{recursive:true});const p=PNG.sync.read(fs.readFileSync(f));for(let i=0;i<p.data.length;i+=4)if(p.data[i]===255&&p.data[i+1]===0&&p.data[i+2]===255)p.data[i+3]=0;fs.writeFileSync(out,PNG.sync.write(p));n++;} console.log(`Cleaned ${n} PNG(s): ${input} -> ${output}`);
+// Narzędzie usuwające tło magentowe (#FF00FF) i zamieniające je na pełną przezroczystość (alpha 0).
+import fs from 'node:fs';
+import path from 'node:path';
+import { PNG } from './png_mini.js';
+
+export function cleanMagentaFromBuffer(buf) {
+  const png = PNG.sync.read(buf);
+  let cleanedCount = 0;
+
+  for (let i = 0; i < png.data.length; i += 4) {
+    const r = png.data[i];
+    const g = png.data[i + 1];
+    const b = png.data[i + 2];
+
+    // Sprawdzenie koloru magenty (#FF00FF) z tolerancją na drobne różnice kwantyzacji
+    if (r >= 250 && g <= 5 && b >= 250) {
+      png.data[i] = 0;
+      png.data[i + 1] = 0;
+      png.data[i + 2] = 0;
+      png.data[i + 3] = 0; // pełna przezroczystość
+      cleanedCount++;
+    }
+  }
+
+  return {
+    buffer: PNG.sync.write(png),
+    cleanedPixels: cleanedCount,
+    width: png.width,
+    height: png.height,
+  };
+}
+
+export function cleanMagentaDirectory(inputDir, outputDir) {
+  fs.mkdirSync(outputDir, { recursive: true });
+  const files = fs.readdirSync(inputDir).filter((f) => f.toLowerCase().endsWith('.png'));
+  console.log(`[CLEAN-MAGENTA] Przetwarzanie ${files.length} plików z ${inputDir} -> ${outputDir}`);
+
+  let totalCleaned = 0;
+  for (const f of files) {
+    const inPath = path.join(inputDir, f);
+    const outPath = path.join(outputDir, f);
+    const inBuf = fs.readFileSync(inPath);
+    const res = cleanMagentaFromBuffer(inBuf);
+    fs.writeFileSync(outPath, res.buffer);
+    console.log(`  ${f}: oczyszczono ${res.cleanedPixels} pikseli magenty (${res.width}x${res.height})`);
+    totalCleaned += res.cleanedPixels;
+  }
+  console.log(`[CLEAN-MAGENTA] Zakończono! Łącznie oczyszczono ${totalCleaned} pikseli.`);
+}
+
+// Uruchomienie jako CLI
+if (process.argv[1] && process.argv[1].endsWith('clean-magenta.mjs')) {
+  const inDir = process.argv[2] || 'assets/source_tiles';
+  const outDir = process.argv[3] || 'assets/clean_128';
+  cleanMagentaDirectory(inDir, outDir);
+}
