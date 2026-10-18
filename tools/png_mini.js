@@ -94,6 +94,9 @@ export function decodePNG(buffer) {
   let height = 0;
   let bitDepth = 8;
   let colorType = 6;
+  let interlace = 0;
+  let palette = null;
+  let paletteAlpha = null;
   const idatChunks = [];
 
   while (offset < buffer.length) {
@@ -107,6 +110,11 @@ export function decodePNG(buffer) {
       height = data.readUInt32BE(4);
       bitDepth = data.readUInt8(8);
       colorType = data.readUInt8(9);
+      interlace = data.readUInt8(12);
+    } else if (type === 'PLTE') {
+      palette = data;
+    } else if (type === 'tRNS') {
+      paletteAlpha = data;
     } else if (type === 'IDAT') {
       idatChunks.push(data);
     } else if (type === 'IEND') {
@@ -114,15 +122,29 @@ export function decodePNG(buffer) {
     }
   }
 
+  if (interlace !== 0) {
+    throw new Error('PNG z przeplotem (interlace) nie jest obsługiwany');
+  }
+  if (bitDepth === 16) {
+    throw new Error('PNG 16-bitowy nie jest obsługiwany');
+  }
+  if (colorType === 3 && !palette) {
+    throw new Error('PNG indeksowany bez palety (PLTE)');
+  }
+
   const compressed = Buffer.concat(idatChunks);
   const raw = zlib.inflateSync(compressed);
 
-  const bpp = colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 0 ? 1 : 4;
+  // Bajty na piksel używane przez filtry PNG (dla indeksowanych < 8 bitów: 1)
+  const bpp = colorType === 3
+    ? 1
+    : colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 0 ? 1 : 4;
+  const bitsPerPixel = colorType === 3 ? bitDepth : bpp * 8;
+  const rowBytes = Math.ceil((width * bitsPerPixel) / 8);
   const out = Buffer.alloc(width * height * 4);
 
   let rawIdx = 0;
   let outIdx = 0;
-  const rowBytes = width * bpp;
   const prevRow = Buffer.alloc(rowBytes);
 
   for (let y = 0; y < height; y++) {
@@ -154,7 +176,20 @@ export function decodePNG(buffer) {
 
     // Kopiowanie do RGBA wyjściowego
     for (let x = 0; x < width; x++) {
-      if (bpp === 4) {
+      if (colorType === 3) {
+        // Paleta indeksowana: 1/2/4/8 bitów na piksel
+        let idx;
+        if (bitDepth === 8) idx = currentRow[x];
+        else if (bitDepth === 4) idx = (currentRow[x >> 1] >> ((x & 1) ? 0 : 4)) & 0x0f;
+        else if (bitDepth === 2) idx = (currentRow[x >> 2] >> ((3 - (x & 3)) * 2)) & 0x03;
+        else idx = (currentRow[x >> 3] >> (7 - (x & 7))) & 0x01;
+        const p = idx * 3;
+        if (p + 2 >= palette.length) throw new Error(`Indeks palety ${idx} poza zakresem`);
+        out[outIdx++] = palette[p];
+        out[outIdx++] = palette[p + 1];
+        out[outIdx++] = palette[p + 2];
+        out[outIdx++] = (paletteAlpha && idx < paletteAlpha.length) ? paletteAlpha[idx] : 255;
+      } else if (bpp === 4) {
         out[outIdx++] = currentRow[x * 4];
         out[outIdx++] = currentRow[x * 4 + 1];
         out[outIdx++] = currentRow[x * 4 + 2];

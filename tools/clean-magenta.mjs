@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PNG } from './png_mini.js';
+import { pruneStaleTiles, logPruned } from './tile-dir-utils.mjs';
 
 export function cleanMagentaFromBuffer(buf) {
   const png = PNG.sync.read(buf);
@@ -34,6 +35,11 @@ export function cleanMagentaDirectory(inputDir, outputDir) {
   fs.mkdirSync(outputDir, { recursive: true });
   const files = fs.readdirSync(inputDir).filter((f) => f.toLowerCase().endsWith('.png'));
   console.log(`[CLEAN-MAGENTA] Przetwarzanie ${files.length} plików z ${inputDir} -> ${outputDir}`);
+
+  // Ten sam katalog = praca w miejscu; nie wolno wtedy sprzątać.
+  if (path.resolve(inputDir) !== path.resolve(outputDir)) {
+    logPruned('CLEAN-MAGENTA', pruneStaleTiles(outputDir, files));
+  }
 
   let totalCleaned = 0;
   for (const f of files) {

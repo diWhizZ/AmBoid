@@ -9,7 +9,7 @@ systemu i standardową instalację.
 
 ---
 
-## 1. Stan faktyczny (2026-10-18)
+## 1. Stan faktyczny (2026-10-19)
 
 | Element | Stan |
 |---|---|
@@ -19,7 +19,7 @@ systemu i standardową instalację.
 | `tools/build_adf.mjs` | **placeholdery**: tekst w bootblocku, `AmBoid` = plik tekstowy |
 | Slave WHDLoad | **nie istnieje** |
 | Pakiet HDD | **nie istnieje** |
-| Test na emulatorze | brak |
+| Emulator | **Amiberry 8.3.0 gotowy** (ROM-y, WHDLoad, whdboot) — czeka na build gry |
 
 Czyli: dziś **nie ma żadnej działającej formy uruchomieniowej na Amidze**.
 Zielony `npm test` tego nie zmienia — sprawdza tylko istnienie ADF-ów.
@@ -115,8 +115,11 @@ node tools/build_whdload.mjs   # pakowanie katalogu + zip (poza gitem)
 
 ## 6. Testowanie
 
-- Emulator: FS-UAE lub WinUAE, profil **A1200 + 68030 + 8 MB fast**,
-  Kickstart 3.1, zainstalowany WHDLoad.
+- Emulator: **Amiberry 8.3.0** jest już zainstalowany i skonfigurowany w systemie
+  deweloperskim (`/usr/bin/amiberry`, ROM-y w `~/Amiberry/ROMs`, WHDLoad +
+  `whdboot` w `/usr/share/amiberry/whdboot/` — patrz `docs/BIBLIA-PROJEKTU.md` §8.1).
+  Alternatywnie FS-UAE lub WinUAE. Profil docelowy: **A1200 + 68030 + 8 MB fast**,
+  Kickstart 3.1 (A1200), zainstalowany WHDLoad.
 - Minimalna bramka: gra startuje z HDD, działa sterowanie, `*` wychodzi do
   Workbencha, save/load nie psuje katalogu pakietu.
 - Test na prawdziwym sprzęcie dopiero po zielonym emulatorze — i po tym, jak

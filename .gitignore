@@ -3,3 +3,9 @@ shots/
 build/
 .DS_Store
 AmBoid-*.zip
+
+# Surowy pack CC0 (itch.io) nie jest commitowany — tylko fixture'y demo/.
+# Skuratorowany podzbiór trafia do assets/source_pack/ (patrz docs/BIBLIA-PROJEKTU.md §4a).
+assets/source/isotilepack/*
+!assets/source/isotilepack/README.md
+!assets/source/isotilepack/demo/

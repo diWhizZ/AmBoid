@@ -13,8 +13,8 @@ Czytaj w tej kolejności:
 5. [`docs/AMIGA.md`](AMIGA.md) — plan sprzętowy Amigi (AGA/RTG/OCS);
 6. [`docs/WHDLOAD.md`](WHDLOAD.md) — docelowa forma dystrybucji.
 
-> Stan dokumentu: **2026-10-18**, gałąź `feat/amiga-port-i-pipeline`
-> (po rebase na `main@361139f`).
+> Stan dokumentu: **2026-10-19**, `main@38d013a` (PR #6 scalony).
+> Praca nad assetami: gałąź `feat/import-isotilepack`.
 
 ---
 
@@ -128,11 +128,94 @@ Jedno źródło: `assets/source_tiles/*.png` (128 px). Wszystko dalej jest produ
 
 Całość: **`npm run pipeline`**. Uwaga z reguły 9: krok 7 nadpisuje eksporty.
 
+Kroki 1–3 **sprzątają osierocone pliki** w katalogach wynikowych
+(`tools/tile-dir-utils.mjs`): gdy zmieni się źródło (np. z proceduralnego
+`assets/source_tiles` na `assets/source_pack`), stary kafel nie zostaje
+w `tiles_*` ani w atlasie. Bez tego atlas puchł o szczątki poprzedniego źródła.
+Sprzątanie jest pomijane przy pracy w miejscu (`in == out`).
+
+### 4a. Zewnętrzny pack CC0 (opcjonalne źródło)
+
+Zamiast ręcznie robionych `assets/source_tiles/*.png` można użyć packa
+**Isometric Tiles — Floor Pack** (Screaming Brain Studios, **CC0 1.0**,
+<https://screamingbrainstudios.itch.io/isotilepack>). Wariant **Small 128×64**
+jest jedynym dozwolonym; Large 256×128 nie wchodzi do tego pipeline'u.
+
+**Uwaga na zawartość archiwum:** to jedno pobranie zawiera **trzy** packi —
+*Floor Tiles*, *Overworld* i *Wall Pack*. Ściany mają inne proporcje (64×96,
+72×100) i są bezużyteczne w tym pipeline'ie; overworld to nie podłogi. Dlatego
+importer ma filtry ścieżek i twardą bramkę geometrii 2:1.
+
+```bash
+# 1. rozpakuj pack do assets/source/isotilepack/ (katalog jest w .gitignore,
+#    poza zacommitowanymi fixture'ami demo/)
+npm run import-pack -- --only "Floor Tiles" --dry-run              # raport
+npm run import-pack -- --only "Floor Tiles" --per-material 8 \
+    --preview shots/pack-preview.png --list shots/pack-candidates.txt
+npm run import-pack -- --only "Floor Tiles" --per-material 8        # -> assets/source_pack/
+npm run pipeline:pack                # clean-magenta -> resize -> quantize (nadpisuje assets/clean_128 itd.)
+npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE docs/amiga/**)
+```
+
+- Importer (`tools/import-isotilepack.mjs`) sam tnie arkusze, wykrywa rozmiar
+  kafla z nazwy pliku (`128x64`), składa płaski katalog i deduplikuje piksele.
+- **Bramka 2:1**: każde `tileW !== 2 × tileH` jest pomijane z raportem. To chroni
+  przed ścianami i „thick” overworldem, których `resize-tiles` nie umie przeskalować.
+- **Filtry**: `--only <fragment>` / `--include`, `--exclude <fragment>` (powtarzalne,
+  dopasowanie po fragmencie ścieżki). Bez nich packi mieszają się w jeden stos.
+- **Mapowanie** materiałów packa na `GROUND_SPEC` (`DEFAULT_MATERIAL_MAP`):
+
+  | pack | rodzaj | uwaga |
+  |---|---|---|
+  | Grass, Flora | `grass` | |
+  | Dry | `dirt` | |
+  | Rocky, Stones | `gravel` | |
+  | Stone, Metal, Grill, Grate | `concrete` | płyty kamienne i kratki metalowe |
+  | Wood | `wood` | |
+  | Tile | `tile` | ceramika |
+  | Pattern | `carpet` | w tym packu to wzorzyste wykładziny |
+  | Brick | `sidewalk` | bruk/płytki, kilka kolorów |
+  | Elements | `water` | tylko woda: `--pick water=1-18` (`Elements_01`) |
+  | Ice | — | pomijane (brak rodzaju w `GROUND_SPEC`) |
+  | *asfalt* | — | **brak w packu**: jezdnie rysujemy sami (ROADMAP, Etap 4) |
+
+  Nadpisanie: `--map grill=concrete,ice=skip`.
+- **Kuracja**: domyślnie **4 kafle na rodzaj** równomiernie z całego zbioru;
+  `--per-material N`, `--all` (wszystko). Ręczny wybór: `--pick grass=1,5,9`
+  albo zakres `--pick water=1-18` (numery 1-based z `--list`), a
+  `--preview <plik.png>` rysuje kontaktówkę wybranych kafli (także z
+  `--dry-run`), `--preview-cols N` ją zawęża.
+- `assets/source_pack/NOTICE.md` dokumentuje CC0, źródło i **komendę odtworzenia**
+  (z filtrami i `--pick`). **Surowy pack nie jest commitowany** (`.gitignore`);
+  do repo wchodzi skuratorowany `assets/source_pack/` (mały, czyni pipeline
+  odtwarzalnym) oraz pochodne atlasy.
+- Sprawdzona komenda dla tego archiwum (daje 82 kafle, **9/10** rodzajów — bez
+  asfaltu, który rysujemy sami):
+
+  ```bash
+  node tools/import-isotilepack.mjs --only "Floor Tiles" --per-material 8 \
+      --pick water=1-18 --preview shots/pack-final.png --list shots/pack-candidates.txt
+  npm run pipeline:pack:full     # NADPISUJE docs/amiga/**
+  ```
+
+  Kolejność kafli w atlasie to porządek alfabetyczny nazw rodzajów; konkretne
+  numery są w `docs/amiga/atlases/atlas_defs.h` (`TILE_ID_*`).
+- Test importera: `npm run test:pack` (24/24, nie wymaga packa — buduje
+  syntetyczne arkusze z fixture'ów `assets/source/isotilepack/demo/`).
+- `png_mini.js` obsługuje też PNG indeksowane (colorType 3, 1/2/4/8 bitów,
+  `PLTE` + `tRNS`), bo packi na itch.io często takie są. 16-bit i interlace
+  są jawnie odrzucane.
+
+**Do wykorzystania później:** `Wall Pack` (Flat 64×96, Thick 72×100) to gotowe
+ściany i okna — materiał na osobny etap (geometria `WALL_H`, inne skalowanie niż
+podłogi), nie na ten importer. Nie mieszać z podłogami przy okazji.
+
 Dodatkowy, **niezależny** demonstrator z PR #5 (`map-demo.html`) ma własne,
 zacommitowane fixture 64×32: `maps/tiled/demo.json`, `assets/atlases/floor-64.png`,
-`assets/source/isotilepack/`, `src/engine/`. **Nie jest częścią pipeline'u** i nie
+`assets/source/isotilepack/demo/`, `src/engine/`. **Nie jest częścią pipeline'u** i nie
 należy go z nim mieszać. Jego narzędzia (`tools/isometric/*`) są testowane przez
-`tools/isometric/test.mjs`.
+`tools/isometric/test.mjs`. Sam katalog `assets/source/isotilepack/` (poza `demo/`)
+służy jako miejsce rozpakowania packa CC0 dla importera z §4a.
 
 ---
 
@@ -143,6 +226,7 @@ npm install          # jedyna zależność: pngjs
 npm test             # pełna bramka jakości
 npm run test:modular # tylko moduły + zgodność z eksportem Amigi
 npm run test:iso     # tylko silnik izometryczny z PR #5
+npm run test:pack    # tylko import packa CC0 + clean/resize/quantize
 npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 ```
 
@@ -155,6 +239,7 @@ npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 | `tools/stress.mjs` | 6000 klatek bez błędu |
 | `tools/test-modular-system.mjs` | **65/65 OK** |
 | `tools/isometric/test.mjs` | `isometric pipeline tests passed` |
+| `tools/test-isotilepack-import.mjs` | **24/24 OK** (import packa, filtry, geometria 2:1, `--pick`, kontaktówka, łańcuch skalowania) |
 
 ### Pułapka: `build/` nie jest w gicie
 
@@ -237,6 +322,11 @@ Historia scalonych PR-ów:
   — stamtąd zaimportowano pracę, której nie było w gicie. **Nie jest źródłem prawdy.**
 - OpenCode V2: sesje w `~/.local/share/opencode/opencode.db`; sesja nie przenosi
   się między maszynami — dlatego istnieje ten dokument.
+- Emulacja Amigi: **Amiberry 8.3.0** (`/usr/bin/amiberry`, konfiguracja
+  `~/.config/amiberry/amiberry.ini`), ROM-y w `~/Amiberry/ROMs` (m.in. KS 3.1
+  A1200/A600), WHDLoad + `whdboot` w `/usr/share/amiberry/whdboot/`. Środowisko
+  gotowe do ręcznych testów WHDLoad (`docs/WHDLOAD.md`); nie jest częścią
+  `npm test` i nie ma jeszcze automatyzacji uruchamiania gier.
 
 ### 8.2 Maszyna z Windows
 
@@ -253,7 +343,7 @@ cd AmBoid
 git checkout main            # albo gałąź zadania
 npm install
 node tools/build_adf.mjs     # obejście braku build/ (placeholdery)
-npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed
+npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 24/24
 ```
 
 Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
@@ -271,6 +361,17 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | 2026-10-18 | `package.json`: nasze skrypty + `test:iso`; `test` uruchamia **oba** testy | naiwne „weź nasze” wyłączyłoby test silnika z #5 |
 | 2026-10-18 | Aliasy `assets:*`, `map:convert`, `amiga:export` z #5 usunięte | nasze narzędzia mają inne sygnatury — aliasy kłamałyby |
 | 2026-10-18 | **WHDLoad = docelowy nośnik**, ADF = artefakt deweloperski | `docs/AMIGA.md` §3; dyskietka nie jest ograniczeniem |
+| 2026-10-19 | PR #6 scalony (`main@38d013a`); dalsza praca na `feat/import-isotilepack` | domknięcie portu/pipeline'u przed grafiką |
+| 2026-10-19 | Źródło grafiki podłóg: pack CC0 SBS, wariant **Small 128×64**, kuratorowany podzbiór | darmowy, komercyjny, 2:1 izometria zgodna z 32×16 po skalowaniu |
+| 2026-10-19 | Importer zapisuje do `assets/source_pack`, nie nadpisuje `assets/source_tiles` | oba źródła (proceduralne i pack) pozostają odtwarzalne |
+| 2026-10-19 | Surowy pack **nie jest commitowany**; w repo skuratorowany `assets/source_pack` + `NOTICE.md` i pochodne atlasy | rozmiar + polityka repo (CC0 pozwala na więcej, ale nie ma potrzeby) |
+| 2026-10-19 | Amiberry 8.3.0 + WHDLoad w systemie = środowisko testów Amigi | użytkownik potwierdził konfigurację; używać przy `docs/WHDLOAD.md` |
+| 2026-10-19 | Importer ma **filtry ścieżek** (`--only`/`--exclude`) i **bramkę 2:1** | jedno archiwum SBS zawiera 3 packi (podłogi, overworld, ściany 64×96); bez tego ściany trafiały na podłogi |
+| 2026-10-19 | `Pattern → carpet`, `Grill/Grate → concrete`, `Stone → concrete` | pack daje 9/10 rodzajów (bez asfaltu); kratki metalowe i płyty kamienne to podłoga, nie droga |
+| 2026-10-19 | **Asfalt rysujemy sami** (4–8 kafli 128×64 + odpowiednik proceduralny) | pack SBS nie ma nic drogowego; `Stone → asphalt` po kwantyzacji wyglądał jak piaskowiec |
+| 2026-10-19 | Integracja pack → gra to **osobne zadanie** | PR #7 kończy narzędzia; `data/tilesets.json` i decyzja proceduralne vs `?art=pack` dopiero przy scalaniu z grą |
+| 2026-10-19 | Kroki 1–3 pipeline'u **sprzątają osierocone kafle** (`tools/tile-dir-utils.mjs`) | przy zmianie źródła stary `path_01`/`stone_01` zostawał w `tiles_*` i atlasie (92 zamiast 90 kafli) |
+| 2026-10-19 | `--pick` przyjmuje zakresy (`water=1-18`) | wybór wody bez wypisywania 18 numerów |
 
 ---
 
@@ -315,4 +416,8 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | **`tileDim`** | funkcja przygaszania kafla (kolejność: RTG → dzień → pamięć → światła) |
 | **blitScaled** | skalowanie indeksów palety filtrem MAJORITY 2×2 |
 | **fixture** | zacommitowane dane demo z PR #5 (64×32), niezależne od pipeline'u |
+| **pack CC0** | zewnętrzny zestaw kafli SBS 128×64; wejście importera (§4a) |
+| **kuracja** | wybór kafli na rodzaj: `--per-material N` (domyślnie 4) albo ręcznie `--pick` |
+| **bramka 2:1** | odrzucanie kafli, gdzie `tileW ≠ 2 × tileH` (ściany 64×96, „thick” 128×72) |
+| **osierocony kafel** | plik w `clean_128`/`tiles_*`/`quantized_64`, którego nie ma już w źródle; kroki 1–3 go usuwają |
 | **WHDLoad** | loader gier z HDD/CF; docelowa forma dystrybucji (patrz `docs/WHDLOAD.md`) |

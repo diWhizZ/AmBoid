@@ -326,6 +326,27 @@ W wersji dodano modularny system izometryczny, stackowanie przedmiotów w JSON, 
    node tools/validate-assets.mjs
    ```
 
+### 1a. Podłogi z gotowego packa (CC0)
+Zamiast rysować własne kafle, możesz użyć darmowego packa **Isometric Floor Pack**
+(Screaming Brain Studios, CC0 1.0). Obowiązuje wariant **Small 128×64**:
+
+```bash
+# rozpakuj pack do assets/source/isotilepack/ (surowy pack nie jest w repo)
+npm run import-pack          # tnie arkusze -> assets/source_pack/<rodzaj>_<nn>.png + NOTICE.md
+npm run pipeline:pack        # clean-magenta -> resize -> quantize (nadpisuje assets/clean_128 itd.)
+npm run pipeline:pack:full   # + atlasy, mapa, items, eksport (NADPISUJE docs/amiga/**)
+```
+
+Importer sam wykrywa rozmiar kafla z nazwy pliku, mapuje materiały packa na
+rodzaje z `src/art.js` (`GROUND_SPEC`) i domyślnie wybiera 4 kafle na rodzaj.
+Przydatne opcje: `--only "<fragment>"` / `--exclude` (archiwum zawiera też
+ściany i overworld), `--per-material N`, `--all`, `--pick grass=1,5,9` (także
+zakresy: `--pick water=1-18`), `--preview shots/podglad.png`,
+`--list shots/kandydaci.txt`, `--map`, `--dry-run`.
+Kafle o proporcjach innych niż 2:1 (ściany 64×96, 72×100) są zawsze pomijane.
+Test: `npm run test:pack`.
+Szczegóły i tabela mapowania: [docs/BIBLIA-PROJEKTU.md](docs/BIBLIA-PROJEKTU.md) §4a.
+
 ### 2. Jak dodać nowy przedmiot
 1. Otwórz plik `data/items.json`.
 2. Dodaj nowy obiekt przedmiotu zgodnie ze specyfikacją:

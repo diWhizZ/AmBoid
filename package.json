@@ -11,6 +11,9 @@
     "shots": "node tools/shots.mjs",
     "texshots": "node tools/texshots.mjs",
     "pipeline": "node tools/clean-magenta.mjs && node tools/resize-tiles.mjs && node tools/quantize-palette.mjs && node tools/build-atlas.mjs && node tools/convert-tiled-map.mjs && node tools/export-items.mjs && node tools/export-amiga.mjs",
+    "import-pack": "node tools/import-isotilepack.mjs",
+    "pipeline:pack": "node tools/clean-magenta.mjs assets/source_pack assets/clean_128 && node tools/resize-tiles.mjs assets/clean_128 assets/tiles_64 assets/tiles_32 && node tools/quantize-palette.mjs assets/tiles_64 assets/quantized_64 aga",
+    "pipeline:pack:full": "npm run pipeline:pack && node tools/build-atlas.mjs && node tools/convert-tiled-map.mjs && node tools/export-items.mjs && node tools/export-amiga.mjs",
     "clean-magenta": "node tools/clean-magenta.mjs",
     "resize-tiles": "node tools/resize-tiles.mjs",
     "build-atlas": "node tools/build-atlas.mjs",
@@ -21,8 +24,9 @@
     "validate-assets": "node tools/validate-assets.mjs",
     "test:modular": "node tools/test-modular-system.mjs",
     "test:iso": "node tools/isometric/test.mjs",
+    "test:pack": "node tools/test-isotilepack-import.mjs",
     "demo:map": "node tools/serve.mjs",
-    "test": "node tools/gametest.mjs && node tools/browsertest.mjs && node tools/browsertest.mjs --view=close && node tools/stress.mjs && node tools/test-modular-system.mjs && node tools/isometric/test.mjs"
+    "test": "node tools/gametest.mjs && node tools/browsertest.mjs && node tools/browsertest.mjs --view=close && node tools/stress.mjs && node tools/test-modular-system.mjs && node tools/isometric/test.mjs && node tools/test-isotilepack-import.mjs"
   },
   "repository": {
     "type": "git",
