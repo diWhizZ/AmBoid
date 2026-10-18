@@ -1,3 +1,35 @@
+# Publikacja wersji — stan po v0.2.5
+
+## v0.2.5 (grunt i podłogi) — co jest gotowe
+
+- [PR #4](https://github.com/diWhizZ/AmBoid/pull/4) z gałęzi sesji
+  `arena/b923a220-amboid`; tag **v0.2.5** i Release utworzone z tego samego
+  commitu co HEAD gałęzi, więc ZIP tagu jest dostępny niezależnie od scalenia.
+- `npm test`: **215 OK, 0 FAIL**, BROWSER-STUB far/close, stress 6000 klatek.
+- **[ZIP tagu v0.2.5](https://github.com/diWhizZ/AmBoid/archive/refs/tags/v0.2.5.zip)**
+  pobrany i zweryfikowany: podfolder `AmBoid-0.2.5`, 82 pliki, `package.json`
+  = 0.2.5, `src/art.js` z nowym generatorem gruntu.
+- [ZIP gałęzi roboczej](https://github.com/diWhizZ/AmBoid/archive/refs/heads/arena/b923a220-amboid.zip)
+  jako kopia stanu PR.
+- Release: https://github.com/diWhizZ/AmBoid/releases/tag/v0.2.5
+
+## Czego brakuje (znane ograniczenie środowiska)
+
+Osobny asset **AmBoid-0.2.5.zip** NIE jest dołączony do Release:
+`gh release upload` kończy się `EOF` na `uploads.github.com` (sprawdzone
+jednokrotnie w tej sesji — nie powtarzać w pętli). Link
+`/releases/download/v0.2.5/AmBoid-0.2.5.zip` byłby więc martwy i nie jest
+przedstawiany jako działający. Lokalnie gotowy, sprawdzony ZIP leży w
+katalogu roboczym sesji jako `AmBoid-0.2.5.zip` (ignorowany przez Git) —
+właściciel repo może go przeciągnąć na stronę Release (ścieżka B niżej).
+ZIP tagu zawiera dokładnie te same źródła, więc gra działa bez tego kroku.
+
+Eksporty Amigi `docs/amiga/**` pozostały historyczne z v0.2.4 i NIE były
+regenerowane w v0.2.5 (`tools/export_amiga.mjs` i `tools/export_map.mjs`
+celowo nieuruchamiane — nadpisują zapisane pliki).
+
+---
+
 # v0.2.4 — zapis na GitHubie i blokada assetu Release
 
 ## Co już jest gotowe
