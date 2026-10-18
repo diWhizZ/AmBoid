@@ -1,0 +1,9 @@
+{
+  "testMap": "maps/tiled/demo.json",
+  "binaryOutput": "maps/converted/demo.ambmap",
+  "orientation": "isometric",
+  "renderOrder": "right-down",
+  "tileSize": { "width": 64, "height": 32 },
+  "layers": ["floor", "walls", "doors", "objects", "collision", "spawn", "triggers"],
+  "cameraZoomSteps": [0.5, 1, 2]
+}

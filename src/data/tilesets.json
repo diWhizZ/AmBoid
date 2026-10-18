@@ -1,0 +1,1 @@
+{"sourcePack":"Screaming Brain Studios Iso Tile Pack","sourceLicense":"CC0","sourceSize":{"width":128,"height":64},"tileSize":{"width":64,"height":32},"scale":"nearest-neighbour 1/2","magenta":"#FF00FF","atlas":"assets/atlases/floor-64.png","columns":8,"palette":{"maxColors":256,"amigaOcsEcsColors":32},"layers":["floor","walls","doors","objects","collision","spawn","triggers"]}

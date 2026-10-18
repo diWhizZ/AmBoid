@@ -1,0 +1,72 @@
+{
+  "tilewidth": 64,
+  "tileheight": 32,
+  "columns": 8,
+  "count": 8,
+  "tiles": [
+    {
+      "id": 1,
+      "name": "demo/demo-01",
+      "x": 0,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 2,
+      "name": "demo/demo-02",
+      "x": 64,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 3,
+      "name": "demo/demo-03",
+      "x": 128,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 4,
+      "name": "demo/demo-04",
+      "x": 192,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 5,
+      "name": "demo/demo-05",
+      "x": 256,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 6,
+      "name": "demo/demo-06",
+      "x": 320,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 7,
+      "name": "demo/demo-07",
+      "x": 384,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    },
+    {
+      "id": 8,
+      "name": "demo/demo-08",
+      "x": 448,
+      "y": 0,
+      "width": 64,
+      "height": 32
+    }
+  ]
+}
