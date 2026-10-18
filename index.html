@@ -25,6 +25,19 @@
         justify-content: center;
         cursor: crosshair;
       }
+      .map-demo-link {
+        position: fixed;
+        top: 10px;
+        right: 12px;
+        z-index: 20;
+        padding: 7px 10px;
+        color: #dce8d8;
+        background: #18231dcc;
+        border: 1px solid #52674f;
+        border-radius: 4px;
+        font: 12px system-ui, sans-serif;
+        text-decoration: none;
+      }
       canvas {
         display: block;
         image-rendering: pixelated;
@@ -61,6 +74,7 @@
     </style>
   </head>
   <body>
+    <a class="map-demo-link" href="./map-demo.html">Demo mapy izometrycznej 64×32 ↗</a>
     <canvas id="screen" width="320" height="200" aria-label="AMBOID — gra"></canvas>
     <div class="crt"></div>
     <script type="module" src="./src/main.js"></script>

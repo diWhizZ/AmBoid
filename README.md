@@ -312,3 +312,7 @@ tools/                serwer, testy, eksport IFF/AMB, zrzuty ekranu
 
 Projekt fanowski, niekomercyjny, hobbystyczny. Kod na licencji MIT.
 Project Zomboid należy do The Indie Stone; Amiga to znak Commodore.
+
+## Izometryczna mapa 64×32 i pipeline assetów
+
+Nowy niezależny demonstrator Canvas2D uruchom przez `npm start` i otwórz `/map-demo.html` (link jest też dostępny z ekranu gry). Sterowanie: WASD/strzałki, E przy drzwiach, +/- zoom. Mapa testowa Tiled, atlas 64×32, binarny konwerter AMI2 i pipeline Amiga-ready opisano w [docs/ISOMETRIC.md](docs/ISOMETRIC.md). Oryginalny Floor Pack pobierz samodzielnie (CC0) i rozpakuj wariant Small 128×64 w `assets/source/isotilepack/`; demo zawiera autorskie fixture, nie kopię pakietu.

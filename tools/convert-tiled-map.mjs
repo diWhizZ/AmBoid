@@ -1,0 +1,8 @@
+// AMI2 binary: magic, version, u16 width/height/tile sizes/layer count; then each layer name + u32 tile count + u16 GIDs; object records preserve properties as UTF-8 JSON.
+import fs from 'node:fs';
+const src=process.argv[2]||'maps/tiled/demo.json',out=process.argv[3]||'maps/converted/demo.ambmap',m=JSON.parse(fs.readFileSync(src,'utf8')),layers=(m.layers||[]).filter(l=>l.type==='tilelayer'),objects=(m.layers||[]).filter(l=>l.type==='objectgroup').flatMap(l=>l.objects||[]);
+const chunks=[];const u8=n=>{const b=Buffer.alloc(1);b.writeUInt8(n&255);return b};const u16=n=>{const b=Buffer.alloc(2);b.writeUInt16BE(n&65535);return b};const u32=n=>{const b=Buffer.alloc(4);b.writeUInt32BE(n>>>0);return b};const str=s=>{const b=Buffer.from(s,'utf8');return Buffer.concat([u16(b.length),b])};
+chunks.push(Buffer.from('AMI2'),u16(1),u16(m.width),u16(m.height),u16(m.tilewidth||64),u16(m.tileheight||32),u16(layers.length));
+for(const l of layers){const data=l.data||[];if(data.length!==m.width*m.height)throw Error(`Layer ${l.name} dimensions mismatch`);chunks.push(str(l.name),u32(data.length));for(const id of data)chunks.push(u16(id));}
+chunks.push(u32(objects.length));for(const o of objects){const payload=Buffer.from(JSON.stringify(o),'utf8');chunks.push(u32(payload.length),payload);}
+const meta=Buffer.from(JSON.stringify({orientation:m.orientation,renderorder:m.renderorder,properties:m.properties||[]}), 'utf8');chunks.push(u32(meta.length),meta);fs.mkdirSync(out.slice(0,out.lastIndexOf('/'))||'.',{recursive:true});fs.writeFileSync(out,Buffer.concat(chunks));console.log(`Converted ${src} -> ${out} (${layers.length} layers, ${objects.length} objects).`);

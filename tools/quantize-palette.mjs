@@ -1,0 +1,6 @@
+// Deterministic frequency-based palette reduction for the Amiga export path.
+import fs from 'node:fs';import {PNG} from 'pngjs';
+const input=process.argv[2]||'assets/atlases/floor-64.png',out=process.argv[3]||'assets/atlases/floor-64-indexed.png',limit=Math.max(2,Math.min(256,Number(process.argv[4]||256)));
+const p=PNG.sync.read(fs.readFileSync(input)),freq=new Map();for(let i=0;i<p.data.length;i+=4){if(!p.data[i+3])continue;const k=(p.data[i]<<16)|(p.data[i+1]<<8)|p.data[i+2];freq.set(k,(freq.get(k)||0)+1);}const palette=[...freq].sort((a,b)=>b[1]-a[1]).slice(0,limit).map(([k])=>[(k>>16)&255,(k>>8)&255,k&255]);
+const indexed=new Uint8Array(p.width*p.height),mask=new Uint8Array(p.width*p.height);for(let j=0,i=0;j<indexed.length;j++,i+=4){mask[j]=p.data[i+3]?1:0;if(!mask[j])continue;let best=0,bd=Infinity;for(let q=0;q<palette.length;q++){const c=palette[q],dr=p.data[i]-c[0],dg=p.data[i+1]-c[1],db=p.data[i+2]-c[2],d=dr*dr+dg*dg+db*db;if(d<bd){bd=d;best=q;}}indexed[j]=best;}
+fs.writeFileSync(out+'.idx',Buffer.from(indexed));fs.writeFileSync(out+'.mask',Buffer.from(mask));fs.writeFileSync(out+'.palette.json',JSON.stringify({width:p.width,height:p.height,alphaMask:out+'.mask',palette},null,2));console.log(`Wrote ${palette.length}-colour index + separate alpha mask to ${out} (limit ${limit}).`);
