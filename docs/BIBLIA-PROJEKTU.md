@@ -170,14 +170,14 @@ npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE doc
   | Grass, Flora | `grass` | |
   | Dry | `dirt` | |
   | Rocky, Stones | `gravel` | |
-  | Metal, Grill, Grate | `concrete` | kratki i ryfle = podłoga przemysłowa |
-  | Stone | `asphalt` | **do oceny**: płyty kamienne czytają się jak piaskowiec, nie jezdnia |
+  | Stone, Metal, Grill, Grate | `concrete` | płyty kamienne i kratki metalowe |
   | Wood | `wood` | |
   | Tile | `tile` | ceramika |
   | Pattern | `carpet` | w tym packu to wzorzyste wykładziny |
   | Brick | `sidewalk` | bruk/płytki, kilka kolorów |
   | Elements | `water` | tylko woda: `--pick water=1-18` (`Elements_01`) |
   | Ice | — | pomijane (brak rodzaju w `GROUND_SPEC`) |
+  | *asfalt* | — | **brak w packu**: jezdnie rysujemy sami (ROADMAP, Etap 4) |
 
   Nadpisanie: `--map grill=concrete,ice=skip`.
 - **Kuracja**: domyślnie **4 kafle na rodzaj** równomiernie z całego zbioru;
@@ -189,17 +189,17 @@ npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE doc
   (z filtrami i `--pick`). **Surowy pack nie jest commitowany** (`.gitignore`);
   do repo wchodzi skuratorowany `assets/source_pack/` (mały, czyni pipeline
   odtwarzalnym) oraz pochodne atlasy.
-- Sprawdzona komenda dla tego archiwum (daje 90 kafli, 10/10 rodzajów):
+- Sprawdzona komenda dla tego archiwum (daje 82 kafle, **9/10** rodzajów — bez
+  asfaltu, który rysujemy sami):
 
   ```bash
   node tools/import-isotilepack.mjs --only "Floor Tiles" --per-material 8 \
       --pick water=1-18 --preview shots/pack-final.png --list shots/pack-candidates.txt
-  npm run pipeline:pack:full     # 90 kafli w atlasie; NADPISUJE docs/amiga/**
+  npm run pipeline:pack:full     # NADPISUJE docs/amiga/**
   ```
 
-  Kolejność kafli w atlasie jest alfabetyczna po nazwie rodzaju: asphalt 0–7,
-  carpet 8–15, concrete 16–23, dirt 24–31, grass 32–39, gravel 40–47,
-  sidewalk 48–55, tile 56–63, water 64–81, wood 82–89.
+  Kolejność kafli w atlasie to porządek alfabetyczny nazw rodzajów; konkretne
+  numery są w `docs/amiga/atlases/atlas_defs.h` (`TILE_ID_*`).
 - Test importera: `npm run test:pack` (24/24, nie wymaga packa — buduje
   syntetyczne arkusze z fixture'ów `assets/source/isotilepack/demo/`).
 - `png_mini.js` obsługuje też PNG indeksowane (colorType 3, 1/2/4/8 bitów,
@@ -367,7 +367,9 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | 2026-10-19 | Surowy pack **nie jest commitowany**; w repo skuratorowany `assets/source_pack` + `NOTICE.md` i pochodne atlasy | rozmiar + polityka repo (CC0 pozwala na więcej, ale nie ma potrzeby) |
 | 2026-10-19 | Amiberry 8.3.0 + WHDLoad w systemie = środowisko testów Amigi | użytkownik potwierdził konfigurację; używać przy `docs/WHDLOAD.md` |
 | 2026-10-19 | Importer ma **filtry ścieżek** (`--only`/`--exclude`) i **bramkę 2:1** | jedno archiwum SBS zawiera 3 packi (podłogi, overworld, ściany 64×96); bez tego ściany trafiały na podłogi |
-| 2026-10-19 | `Pattern → carpet`, `Grill → concrete`, `Stone → asphalt` | pack daje 10/10 rodzajów; kratki metalowe to podłoga przemysłowa; kamień jako jezdnia **wymaga jeszcze oceny** (wygląda jak piaskowiec) |
+| 2026-10-19 | `Pattern → carpet`, `Grill/Grate → concrete`, `Stone → concrete` | pack daje 9/10 rodzajów (bez asfaltu); kratki metalowe i płyty kamienne to podłoga, nie droga |
+| 2026-10-19 | **Asfalt rysujemy sami** (4–8 kafli 128×64 + odpowiednik proceduralny) | pack SBS nie ma nic drogowego; `Stone → asphalt` po kwantyzacji wyglądał jak piaskowiec |
+| 2026-10-19 | Integracja pack → gra to **osobne zadanie** | PR #7 kończy narzędzia; `data/tilesets.json` i decyzja proceduralne vs `?art=pack` dopiero przy scalaniu z grą |
 | 2026-10-19 | Kroki 1–3 pipeline'u **sprzątają osierocone kafle** (`tools/tile-dir-utils.mjs`) | przy zmianie źródła stary `path_01`/`stone_01` zostawał w `tiles_*` i atlasie (92 zamiast 90 kafli) |
 | 2026-10-19 | `--pick` przyjmuje zakresy (`water=1-18`) | wybór wody bez wypisywania 18 numerów |
 

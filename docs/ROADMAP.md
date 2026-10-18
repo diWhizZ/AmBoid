@@ -46,11 +46,10 @@ Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
       `clean_128`/`tiles_*`/`quantized_64` (bez tego atlas puchł o szczątki
       poprzedniego źródła — realnie `path_01`, `stone_01` → 92 zamiast 90 kafli)
 - [x] Weryfikacja na realnym packu: Floor Pack = 28 arkuszy / 504 kafle;
-      pokrycie 10/10 rodzajów (po przemapowaniu `Pattern → carpet`); ściany
+      pokrycie 9/10 rodzajów (bez asfaltu; `Pattern → carpet`); ściany
       i overworld odsiane bramką 2:1 (47 plików)
-- [x] Odtworzony atlas Amigi z packa: 90 kafli (asphalt 0–7, carpet 8–15,
-      concrete 16–23, dirt 24–31, grass 32–39, gravel 40–47, sidewalk 48–55,
-      tile 56–63, water 64–81, wood 82–89); ocena wizualna w `shots/`
+- [x] Odtworzony atlas Amigi z packa: 82 kafle (9 rodzajów; kolejność
+      alfabetyczna, numery w `atlas_defs.h`); ocena wizualna w `shots/`
 
 ## Etap 4 — następna wersja (grafika rozgrywki)
 
@@ -86,34 +85,35 @@ rozstrzygnięcia zostaje **jak pack trafia do gry**:
 
 Rezultat weryfikacji na realnym packu (2026-10-19):
 
-- Floor Pack daje **wszystkie 10 rodzajów**; `Pattern` przemapowane na `carpet`,
-  więc `carpet` ma wreszcie źródło plikowe.
-- **`Grill → concrete`** (decyzja): kratki i ryfle metalowe to podłoga
-  przemysłowa, nie jezdnia.
-- **`asphalt` ← `Stone`** (decyzja „użyj czegoś z kamienia”) — **wymaga jeszcze
-  oceny**: płyty kamienne po kwantyzacji czytają się jak jasny piaskowiec, nie
-  jezdnia (`shots/atlas-vs-source.png`). Opcje: `--pick asphalt=<ciemne płyty>`,
-  powrót do `Grill → asphalt`, albo dorysowanie własnych kafli jezdni.
+- Floor Pack daje **9 z 10 rodzajów** `GROUND_SPEC`; `Pattern` przemapowane na
+  `carpet`, więc `carpet` ma wreszcie źródło plikowe.
+- **`Grill/Grate → concrete`**, **`Stone → concrete`** (decyzja): kratki metalowe
+  i płyty kamienne to podłoga, nie droga.
+- **`asphalt` nie ma źródła w packu** — decyzja: **rysujemy własne kafle**
+  (4–8 × 128×64 z magenta tłem, ten sam pipeline) plus odpowiednik w
+  `makeGroundTiles`. Sprawdzone: `Stone → asphalt` po kwantyzacji czyta się jak
+  piaskowiec (`shots/atlas-vs-source.png`).
 - **`water` ← `Elements`**: arkusz `Elements_01` to woda, `Elements_02` to
   bagno/mul — wybrane ręcznie: `--pick water=1-18`.
 - **`ice`** pomijane (brak rodzaju); `Wall Pack` (64×96, 72×100) to materiał na
   osobny etap ścian, nie na ten importer.
-- Odtworzony atlas Amigi ma 90 kafli; ocena wizualna: `shots/pack-final.png`
+- Atlas Amigi odtworzony z packa: 82 kafle. Ocena wizualna: `shots/pack-final.png`
   (źródła), `shots/atlas-vs-source.png` (źródło vs komórka atlasu),
   `shots/compare-kinds.png` (materiały packa), `shots/pack-candidates.txt`
   (numery do `--pick`).
 
-Zanim pack stanie się grafiką gry, trzeba jeszcze:
+Zadanie „pack → gra” (osobne, do otwarcia po scaleniu PR #7):
 
-1. zamrozić `--pick` dla `asphalt` i `water` (i ewentualnie liczbę wariantów),
-2. przeliczyć `data/tilesets.json`: po przejściu na pack wiszą odwołania
+1. dorysować kafle `asphalt_01..0N` (128×64, magenta tło) do
+   `assets/source_tiles/` i odpowiednik proceduralny w `makeGroundTiles`;
+2. zamrozić `--pick` dla `water` i liczbę wariantów na rodzaj;
+3. przeliczyć `data/tilesets.json`: po przejściu na pack wiszą odwołania
    `tile/stone_01` i `tile/path_01` (zniknęły), a `tile/lava_01` i
    `tile/panel_blinking` nigdy nie miały plików — nazwy podłóg w packu to
-   `<rodzaj>_<nn>`,
-3. zdecydować o przeglądarce: `makeGroundTiles` proceduralnie vs `?art=pack`,
-4. świadomie zacommitować produkty (`assets/clean_128|tiles_*|quantized_64`,
-   `docs/amiga/**`) razem ze zmianą źródła — dziś są w drzewie roboczym
-   przywrócone do wersji proceduralnej.
+   `<rodzaj>_<nn>`;
+4. zdecydować o przeglądarce: `makeGroundTiles` proceduralnie vs `?art=pack`;
+5. świadomie zacommitować produkty (`assets/clean_128|tiles_*|quantized_64`,
+   `docs/amiga/**`) razem ze zmianą źródła.
 
 Rekomendacja: ocenić atlasy (Amiberry 8.3.0 jest w systemie), dopiero potem
 decydować o przeglądarce. Nie zmieniać `tilesets.json`, dopóki atlasy nie są

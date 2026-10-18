@@ -10,8 +10,8 @@ Ten katalog zawiera **pochodne** kafli z packa:
 Pack źródłowy **nie jest** commitowany do repozytorium. Zawartość tego katalogu
 powstała przez wycięcie arkuszy i wybór podzbioru (`tools/import-isotilepack.mjs`).
 
-Wygenerowano: 2026-10-18T23:38:36.503Z
-Pozycje: 90
+Wygenerowano: 2026-10-18T23:42:39.889Z
+Pozycje: 82
 
 ## Odtworzenie
 
@@ -29,13 +29,12 @@ geometrii (ściany) są pomijane.
 | --- | ---: | ---: |
 | grass | 72 | 8 |
 | dirt | 36 | 8 |
-| asphalt | 36 | 8 |
 | sidewalk | 36 | 8 |
 | wood | 36 | 8 |
 | tile | 36 | 8 |
 | carpet | 36 | 8 |
 | water | 36 | 18 |
-| concrete | 72 | 8 |
+| concrete | 108 | 8 |
 | gravel | 72 | 8 |
 
 ## Pominięte materiały (brak odpowiednika w GROUND_SPEC)

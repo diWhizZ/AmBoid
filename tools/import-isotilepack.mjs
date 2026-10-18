@@ -23,11 +23,12 @@ export const DEFAULT_MATERIAL_MAP = {
   grass: 'grass', flora: 'grass', bush: 'grass', plant: 'grass',
   dry: 'dirt', dirt: 'dirt', mud: 'dirt', soil: 'dirt',
   rocky: 'gravel', stones: 'gravel', gravel: 'gravel', rubble: 'gravel',
-  // "Stone" w tym packu to płyty kamienne (bruk) — nasze jezdnie.
-  stone: 'asphalt', asphalt: 'asphalt',
-  concrete: 'concrete', metal: 'concrete', steel: 'concrete',
-  // "Grill" to kratki i ryfle metalowe — podłoga przemysłowa, nie droga.
+  // Asfaltu nie ma w tym packu — jezdnie rysujemy sami (patrz ROADMAP, Etap 4).
+  // "Stone" to płyty kamienne, a "Grill" to kratki/ryfle metalowe; oba są
+  // podłogą (przemysłową/brukiem), nie drogą.
+  stone: 'concrete', concrete: 'concrete', metal: 'concrete', steel: 'concrete',
   grill: 'concrete', grate: 'concrete',
+  asphalt: 'asphalt',
   brick: 'sidewalk', sidewalk: 'sidewalk', pavement: 'sidewalk', paving: 'sidewalk',
   tile: 'tile', ceramic: 'tile', mosaic: 'tile',
   // "Pattern" w tym packu to wzorzyste wykładziny/dywany, nie kafle.
