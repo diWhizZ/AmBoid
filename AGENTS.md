@@ -25,9 +25,12 @@ npm start              # serwer podglądu, tools/serve.mjs, http://localhost:808
 npm test               # PEŁNY zestaw: gametest + browsertest + browsertest --view=close + stress + test-modular-system + isometric/test
 npm run test:modular   # tylko testy modułów i zgodności z eksportem Amigi (65/65)
 npm run test:iso       # tylko silnik izometryczny z PR #5 (map-demo.html)
-npm run test:pack      # tylko import packa CC0 + clean/resize/quantize (24/24)
+npm run test:pack      # tylko import packa CC0 + clean/resize/quantize (27/27)
+npm run test:bake      # tylko wypalanie podłóg proceduralnych do PNG 128x64 (5/5)
+npm run bake-tiles     # asphalt_01..06 z src/art.js -> assets/source_tiles
 npm run pipeline       # clean-magenta -> resize-tiles -> quantize-palette -> build-atlas -> convert-tiled-map -> export-items -> export-amiga
 npm run import-pack    # tnie pack CC0 (Small 128x64) -> assets/source_pack + NOTICE.md
+                         # --also <dir> dokłada rodzaje, których pack nie ma (np. asphalt)
 npm run pipeline:pack  # clean-magenta/resize/quantize na assets/source_pack (nadpisuje assets/clean_128, tiles_*, quantized_64)
 npm run pipeline:pack:full  # pipeline:pack + atlas/mapa/items/eksport (NADPISUJE docs/amiga/**)
 npm run validate-assets
@@ -81,16 +84,16 @@ w każdym zadaniu graficznym:
 | `src/render/` | `iso_renderer.js` |
 | `amiga/` | port natywny: `src/render/render_{aga,ocs,rtg}.c`, `src/audio/audio_paula.c`, `src/input/input_custom.c`, `src/platform/`, `src/core/`, `include/`, `Makefile` |
 | `tools/` | serwer, testy, pipeline assetów, eksport IFF/AMB, ADF |
-| `assets/` | `source_tiles` (źródła proceduralne) + `source_pack` (pack CC0, generowane) → `clean_128` → `tiles_64`/`tiles_32` → `quantized_64`; wszystko poza źródłami jest produktem pipeline'u |
+| `assets/` | `source_tiles` (źródła: wypalane z `src/art.js` i zaślepki) + `source_pack` (pack CC0 + `--also`, generowane) → `clean_128` → `tiles_64`/`tiles_32` → `quantized_64`; wszystko poza źródłami jest produktem pipeline'u |
 | `data/` | `items.json`, `tilesets.json`, `maps/*` (Tiled → `sample_map.amb`) |
 | `docs/` | `BIBLIA-PROJEKTU.md`, `ROADMAP.md`, `WHDLOAD.md`, `AMIGA.md`, `GDD.md`, `GRAFIKA.md`, `WINDOWS.md`, `PUBLIKACJA.md`, `ISOMETRIC.md`, `PROMPT-KONTYNUACJA.md`, `prompts/`, `screens/`, `amiga/**` (eksporty — generowane) |
 | `build/` | **nie w repo** (`.gitignore`) — `build/amiga/*.adf` i paczka AmigaOS są assetem Release |
 
 ## Testy i jakość
 
-- Przed każdym PR: `npm test`, wymagane **215 OK / 0 FAIL**, modular **65/65**
-  i import packa **24/24**. `BROWSER-STUB` dla widoków far/close jest oczekiwany
-  (brak prawdziwego DOM).
+- Przed każdym PR: `npm test`, wymagane **215 OK / 0 FAIL**, modular **65/65**,
+  import packa **27/27** i wypalanie podłóg **5/5**. `BROWSER-STUB` dla widoków
+  far/close jest oczekiwany (brak prawdziwego DOM).
 - Nową regułę mechaniczną dodawaj do `tools/gametest.mjs`, a regułę dotyczącą
   modułów/eksportu do `tools/test-modular-system.mjs`.
 - Test na ADF-y czyta `build/amiga/`; jeśli katalogu nie ma, uruchom

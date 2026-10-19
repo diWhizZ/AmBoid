@@ -10,13 +10,13 @@ Ten katalog zawiera **pochodne** kafli z packa:
 Pack źródłowy **nie jest** commitowany do repozytorium. Zawartość tego katalogu
 powstała przez wycięcie arkuszy i wybór podzbioru (`tools/import-isotilepack.mjs`).
 
-Wygenerowano: 2026-10-18T23:42:39.889Z
-Pozycje: 82
+Wygenerowano: 2026-10-18T23:55:24.463Z
+Pozycje: 88
 
 ## Odtworzenie
 
 ```bash
-node tools/import-isotilepack.mjs --per-material 8 --only "Floor Tiles" --pick water=1-18
+node tools/import-isotilepack.mjs --per-material 8 --only "Floor Tiles" --also "assets/source_tiles" --pick water=1-18
 npm run pipeline:pack
 ```
 
@@ -25,17 +25,25 @@ geometrii (ściany) są pomijane.
 
 ## Wybrane rodzaje
 
-| rodzaj | znalezione | wybrane |
-| --- | ---: | ---: |
-| grass | 72 | 8 |
-| dirt | 36 | 8 |
-| sidewalk | 36 | 8 |
-| wood | 36 | 8 |
-| tile | 36 | 8 |
-| carpet | 36 | 8 |
-| water | 36 | 18 |
-| concrete | 108 | 8 |
-| gravel | 72 | 8 |
+| rodzaj | znalezione | wybrane | źródło |
+| --- | ---: | ---: | --- |
+| grass | 72 | 8 | pack |
+| dirt | 36 | 8 | pack |
+| asphalt | 6 | 6 | własne (`--also`) |
+| sidewalk | 36 | 8 | pack |
+| wood | 36 | 8 | pack |
+| tile | 36 | 8 | pack |
+| carpet | 36 | 8 | pack |
+| water | 36 | 18 | pack |
+| concrete | 108 | 8 | pack |
+| gravel | 72 | 8 | pack |
+
+## Rodzaje spoza packa
+
+Pack nie ma kafli tych rodzajów — pochodzą z katalogu podanego w `--also`
+(wypalone z `src/art.js`, `tools/bake-ground-tiles.mjs`):
+
+- asphalt: 6
 
 ## Pominięte materiały (brak odpowiednika w GROUND_SPEC)
 

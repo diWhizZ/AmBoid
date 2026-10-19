@@ -348,6 +348,43 @@ export function importIsotilePack(opts = {}) {
     }
   }
 
+  // Uzupełnienia z --also: rodzaje, których pack nie ma (np. asfalt w Floor
+  // Packu), bierzemy z własnych źródeł (`assets/source_tiles`) — dopiero gdy
+  // pack nie dał nic, żeby nie mieszać dwóch stylów w jednym rodzaju.
+  // Nazwy plików: `<rodzaj>_<nn>.png`, jak reszta katalogu wynikowego.
+  const alsoRaw = (opts.also || []).map(String);
+  const alsoDirs = alsoRaw.map((d) => path.resolve(d));
+  for (const dir of alsoDirs) {
+    if (!fs.existsSync(dir)) throw new Error(`Brak katalogu --also: ${dir}`);
+  }
+  const ownCounts = new Map();
+  for (const kind of GROUND_KINDS) {
+    if (byKind.get(kind).length) continue;
+    for (const dir of alsoDirs) {
+      const names = fs.readdirSync(dir)
+        .filter((f) => new RegExp(`^${kind}_\\d+\\.png$`, 'i').test(f))
+        .sort();
+      if (!names.length) continue;
+      for (const name of names) {
+        const png = PNG.sync.read(fs.readFileSync(path.join(dir, name)));
+        if (png.width !== png.height * 2) {
+          skipped.wrongAspect++;
+          if (opts.verbose) {
+            console.warn(`  ! pominięto ${name} (--also): ${png.width}x${png.height} nie jest 2:1`);
+          }
+          continue;
+        }
+        const h = hashTile(png);
+        if (seen.has(h)) { skipped.duplicate++; continue; }
+        seen.add(h);
+        const num = Number((name.match(/_(\d+)\.png$/i) || [])[1] || 0);
+        byKind.get(kind).push({ png, rel: name, pos: num, source: `${name} (własny)` });
+        ownCounts.set(kind, (ownCounts.get(kind) || 0) + 1);
+      }
+      if (byKind.get(kind).length) break; // pierwszy katalog, który coś dał
+    }
+  }
+
   // Kuracja: ręcznie (--pick) albo równomiernie, deterministycznie po źródle.
   const selected = [];
   const report = [];
@@ -366,7 +403,7 @@ export function importIsotilePack(opts = {}) {
     });
     previewRows.push({ kind, pngs: picked.map((t) => t.png) });
     catalog.push({ kind, items: list });
-    report.push({ kind, found: list.length, picked: picked.length });
+    report.push({ kind, found: list.length, picked: picked.length, own: ownCounts.get(kind) || 0 });
   }
 
   const preview = opts.preview ? renderPreview(previewRows, opts.preview, 2, opts.previewCols || 0) : null;
@@ -382,12 +419,13 @@ export function importIsotilePack(opts = {}) {
       const name = `${s.kind}_${String(s.index).padStart(2, '0')}.png`;
       fs.writeFileSync(path.join(outputDir, name), PNG.sync.write(s.png));
     }
-    writeNotice(outputDir, { inputDir, perMaterial, picks, only: onlyRaw, exclude: excludeRaw, selected: selected.length, report, unmappedMaterials, totalTiles, skipped });
+    writeNotice(outputDir, { inputDir, perMaterial, picks, only: onlyRaw, exclude: excludeRaw, also: alsoRaw, selected: selected.length, report, unmappedMaterials, totalTiles, skipped });
   }
 
   return {
     files: files.length, usedFiles: selectedFiles.length, sheets, singleTiles, totalTiles,
     selected: selected.length, report, skipped, unmappedMaterials, wrongAspectDirs,
+    ownKinds: [...ownCounts.keys()], ownCounts,
     outputDir, dryRun, preview, catalogPath: opts.list ? path.resolve(opts.list) : null,
   };
 }
@@ -415,6 +453,7 @@ function writeNotice(outputDir, info) {
     ('node tools/import-isotilepack.mjs --per-material ' + (info.perMaterial ?? 4)
       + (info.only && info.only.length ? info.only.map((s) => ` --only "${s}"`).join('') : '')
       + (info.exclude && info.exclude.length ? info.exclude.map((s) => ` --exclude "${s}"`).join('') : '')
+      + (info.also && info.also.length ? info.also.map((s) => ` --also "${s}"`).join('') : '')
       + Object.entries(info.picks || {}).map(([k, v]) => ` --pick ${k}=${formatPickNumbers(v)}`).join('')),
     'npm run pipeline:pack',
     '```',
@@ -424,11 +463,23 @@ function writeNotice(outputDir, info) {
     '',
     '## Wybrane rodzaje',
     '',
-    '| rodzaj | znalezione | wybrane |',
-    '| --- | ---: | ---: |',
-    ...info.report.map((r) => `| ${r.kind} | ${r.found} | ${r.picked} |`),
+    '| rodzaj | znalezione | wybrane | źródło |',
+    '| --- | ---: | ---: | --- |',
+    ...info.report.map((r) => `| ${r.kind} | ${r.found} | ${r.picked} | ${r.own ? 'własne (`--also`)' : 'pack'} |`),
     '',
   ];
+  const own = info.report.filter((r) => r.own);
+  if (own.length) {
+    lines.push(
+      '## Rodzaje spoza packa',
+      '',
+      'Pack nie ma kafli tych rodzajów — pochodzą z katalogu podanego w `--also`',
+      '(wypalone z `src/art.js`, `tools/bake-ground-tiles.mjs`):',
+      '',
+      ...own.map((r) => `- ${r.kind}: ${r.picked}`),
+      '',
+    );
+  }
   if (info.unmappedMaterials.size) {
     lines.push('## Pominięte materiały (brak odpowiednika w GROUND_SPEC)', '');
     for (const [name, count] of [...info.unmappedMaterials].sort()) {
@@ -442,7 +493,7 @@ function writeNotice(outputDir, info) {
 // --- CLI ---------------------------------------------------------------
 
 function parseArgs(argv) {
-  const opts = { perMaterial: 4, dryRun: false, verbose: false, materialMap: {}, only: [], exclude: [], picks: {} };
+  const opts = { perMaterial: 4, dryRun: false, verbose: false, materialMap: {}, only: [], exclude: [], also: [], picks: {} };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') opts.dryRun = true;
@@ -453,6 +504,7 @@ function parseArgs(argv) {
     else if (a === '--per-material') opts.perMaterial = Number(argv[++i]);
     else if (a === '--only' || a === '--include') opts.only.push(argv[++i]);
     else if (a === '--exclude') opts.exclude.push(argv[++i]);
+    else if (a === '--also') opts.also.push(argv[++i]);
     else if (a === '--preview') opts.preview = argv[++i];
     else if (a === '--preview-cols') opts.previewCols = Number(argv[++i]);
     else if (a === '--list') opts.list = argv[++i];
@@ -474,6 +526,8 @@ function parseArgs(argv) {
   --out <dir>           katalog wynikowy (domyślnie assets/source_pack)
   --only <fragment>     tylko ścieżki zawierające fragment (można powtarzać)
   --exclude <fragment>  pomiń ścieżki zawierające fragment (można powtarzać)
+  --also <dir>          uzupełnij rodzaje, których pack nie ma (np. asphalt),
+                        z własnych źródeł <rodzaj>_<nn>.png (można powtarzać)
   --per-material <n>    ile kafli na rodzaj (domyślnie 4, 0 = wszystkie)
   --all                 skrót na --per-material 0
   --pick <rodzaj=i,j-l> ręczny wybór kafli po numerach (1-based, zakresy); powtarzalne
@@ -492,12 +546,12 @@ pipeline graficzny jest ściśle 2:1 (128x64 -> 64x32 -> 32x16).`);
   return opts;
 }
 
-if (process.argv[1] && process.argv[1].endsWith('import-isotilepack.mjs')) {
+if (process.argv[1] && path.basename(process.argv[1]) === 'import-isotilepack.mjs') {
   try {
     const res = importIsotilePack(parseArgs(process.argv.slice(2)));
     console.log(`[IMPORT] Pliki: ${res.files}${res.usedFiles !== res.files ? ` (po filtrach: ${res.usedFiles})` : ''}, arkusze: ${res.sheets}, pojedyncze: ${res.singleTiles}, kafli: ${res.totalTiles}`);
     for (const r of res.report) {
-      console.log(`  ${r.kind.padEnd(10)} znaleziono ${String(r.found).padStart(3)} -> wybrano ${r.picked}`);
+      console.log(`  ${r.kind.padEnd(10)} znaleziono ${String(r.found).padStart(3)} -> wybrano ${r.picked}${r.own ? ' (własne, --also)' : ''}`);
     }
     const s = res.skipped;
     console.log(`[IMPORT] Pominięto: puste ${s.blank}, duplikaty ${s.duplicate}, bez mapowania ${s.unmapped}, zły rozmiar ${s.badSize}, nie 2:1 ${s.wrongAspect}`);

@@ -332,6 +332,7 @@ Zamiast rysować własne kafle, możesz użyć darmowego packa **Isometric Floor
 
 ```bash
 # rozpakuj pack do assets/source/isotilepack/ (surowy pack nie jest w repo)
+npm run bake-tiles           # asfalt: wypala src/art.js -> assets/source_tiles/asphalt_*.png
 npm run import-pack          # tnie arkusze -> assets/source_pack/<rodzaj>_<nn>.png + NOTICE.md
 npm run pipeline:pack        # clean-magenta -> resize -> quantize (nadpisuje assets/clean_128 itd.)
 npm run pipeline:pack:full   # + atlasy, mapa, items, eksport (NADPISUJE docs/amiga/**)
@@ -341,11 +342,19 @@ Importer sam wykrywa rozmiar kafla z nazwy pliku, mapuje materiały packa na
 rodzaje z `src/art.js` (`GROUND_SPEC`) i domyślnie wybiera 4 kafle na rodzaj.
 Przydatne opcje: `--only "<fragment>"` / `--exclude` (archiwum zawiera też
 ściany i overworld), `--per-material N`, `--all`, `--pick grass=1,5,9` (także
-zakresy: `--pick water=1-18`), `--preview shots/podglad.png`,
+zakresy: `--pick water=1-18`), `--also assets/source_tiles` (uzupełnia rodzaje,
+których pack nie ma — np. asfalt), `--preview shots/podglad.png`,
 `--list shots/kandydaci.txt`, `--map`, `--dry-run`.
 Kafle o proporcjach innych niż 2:1 (ściany 64×96, 72×100) są zawsze pomijane.
-Test: `npm run test:pack`.
+Testy: `npm run test:pack` i `npm run test:bake`.
 Szczegóły i tabela mapowania: [docs/BIBLIA-PROJEKTU.md](docs/BIBLIA-PROJEKTU.md) §4a.
+
+### 1b. Własne kafle podłóg (wypalanie z gry)
+`npm run bake-tiles` wypala kafle z `src/art.js` (te same, które rysuje gra)
+do PNG 128×64 z tłem magenta. Skalowanie ×4 i późniejsze ÷2 ÷2 wraca dokładnie
+do 32×16, więc atlas Amigi jest identyczny z obrazem w przeglądarce.
+`node tools/bake-ground-tiles.mjs --all` wypala wszystkie rodzaje z `GROUND_SPEC`.
+Test: `npm run test:bake`.
 
 ### 2. Jak dodać nowy przedmiot
 1. Otwórz plik `data/items.json`.

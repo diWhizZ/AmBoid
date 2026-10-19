@@ -2,11 +2,12 @@
 
 Stan na **2026-10-19**:
 
-- `main` = `38d013a` (**PR #6 scalony**: port Amigi + pipeline + moduły),
+- `main` = `6e04e82` (**PR #6 i #7 scalone**: port Amigi + pipeline + moduły +
+  import packa CC0),
 - tagi i Release: `v0.2.4`, `v0.2.5`,
-- gałąź bieżąca: `feat/import-isotilepack` (import packa CC0),
+- gałąź bieżąca: `feat/asphalt-floors` (własne kafle podłóg — wypalanie z gry),
 - bramka: `npm test` = **215 OK / 0 FAIL**, modular **65/65**, iso **passed**,
-  pack **24/24**,
+  pack **27/27**, bake **5/5**,
 - kontekst projektu: [`docs/BIBLIA-PROJEKTU.md`](BIBLIA-PROJEKTU.md),
 - dystrybucja: [`docs/WHDLOAD.md`](WHDLOAD.md).
 
@@ -28,16 +29,16 @@ Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
 - [x] Instrukcje w README: dodanie tekstury, przedmiotu i mapy (Tiled → AMB2)
 - [x] **PR #6 scalony** do `main` (`38d013a`)
 
-## Zrobione na `feat/import-isotilepack` (do scalenia)
+## Zrobione na `feat/import-isotilepack` (PR #7, scalone w `main`)
 
 - [x] `tools/import-isotilepack.mjs` — cięcie arkuszy 128×64, detekcja materiału
       z nazw plików/folderów, mapa na `GROUND_SPEC`, deduplikacja, kuracja
       (`--per-material`, domyślnie 4), filtry ścieżek (`--only`/`--exclude`),
-      twarda bramka geometrii 2:1, ręczny wybór (`--pick`), kontaktówka
-      (`--preview`), katalog kandydatów (`--list`), `NOTICE.md` (CC0)
-- [x] `tools/test-isotilepack-import.mjs` — 24/24 (m.in. PNG indeksowany,
-      determinizm, filtry, bramka 2:1, `--pick` + zakresy, kontaktówka, katalog
-      kandydatów, sprzątanie osieroconych plików, łańcuch clean→resize→quantize);
+      twarda bramka geometrii 2:1, ręczny wybór (`--pick`, także zakresy),
+      kontaktówka (`--preview`), katalog kandydatów (`--list`), `NOTICE.md` (CC0)
+- [x] `tools/test-isotilepack-import.mjs` — m.in. PNG indeksowany, determinizm,
+      filtry, bramka 2:1, `--pick` + zakresy, kontaktówka, katalog kandydatów,
+      sprzątanie osieroconych plików, łańcuch clean→resize→quantize;
       wpięty w `npm test`
 - [x] `png_mini.js`: obsługa PNG indeksowanych (PLTE + tRNS, 1/2/4/8 bitów)
 - [x] Skrypty `import-pack`, `pipeline:pack`, `pipeline:pack:full`, `test:pack`
@@ -46,10 +47,27 @@ Kolejność etapów pochodzi z `docs/PROMPT-KONTYNUACJA.md`.
       `clean_128`/`tiles_*`/`quantized_64` (bez tego atlas puchł o szczątki
       poprzedniego źródła — realnie `path_01`, `stone_01` → 92 zamiast 90 kafli)
 - [x] Weryfikacja na realnym packu: Floor Pack = 28 arkuszy / 504 kafle;
-      pokrycie 9/10 rodzajów (bez asfaltu; `Pattern → carpet`); ściany
+      `Pattern → carpet`, `Stone/Metal/Grill/Grate → concrete`; ściany
       i overworld odsiane bramką 2:1 (47 plików)
-- [x] Odtworzony atlas Amigi z packa: 82 kafle (9 rodzajów; kolejność
-      alfabetyczna, numery w `atlas_defs.h`); ocena wizualna w `shots/`
+- [x] `assets/source_pack/` = skuratorowany podzbiór + `NOTICE.md` z komendą
+      odtworzenia (pack źródłowy zostaje poza repo)
+
+## Zrobione na `feat/asphalt-floors` (własne kafle podłóg)
+
+- [x] `tools/bake-ground-tiles.mjs` — wypala kafle z `buildArt()` do PNG 128×64
+      z tłem magenta; liczba wariantów z `GROUND_SPEC`, wynik deterministyczny
+- [x] `assets/source_tiles/asphalt_01..06.png` — asfalt, którego pack nie ma
+      (×4 z 32×16; `resize-tiles` wraca dokładnie do kafla z przeglądarki)
+- [x] `tools/test-bake-ground-tiles.mjs` — 5/5 (geometria, tło, determinizm,
+      powrót przez clean-magenta + resize ÷2 ÷2 do 32×16); wpięty w `npm test`
+- [x] Importer: `--also <dir>` dokłada rodzaje, których pack nie ma — i tylko
+      wtedy, gdy pack nie dał dla nich nic (dwa style nie mieszają się)
+- [x] Atlas Amigi z packa + asfaltu: **88 kafli, 10/10 rodzajów**
+      (asphalt 0–5, carpet 6–13, …, water 62–79, wood 80–87); zbudowany i oceniony:
+      `shots/atlas-vs-source.png`, `shots/pack-final.png`, `shots/asphalt-baked.png`.
+      Same produkty (`clean_128`, `tiles_*`, `quantized_64`, `docs/amiga/**`)
+      świadomie **nie** wchodzą do repo — czekają na zadanie „pack → gra”, żeby
+      nie zostawiać atlasu rozjechanego z `data/tilesets.json`
 
 ## Etap 4 — następna wersja (grafika rozgrywki)
 
@@ -59,9 +77,11 @@ i mirroring boków. Efekty limitowane (krew, łuski, dym, błysk wystrzału, śl
 stóp) — nigdy nie rosnące bez końca. Portret i pasek stanu dopracowane w 320×200.
 
 - [ ] Ikony ekwipunku i łupów z jednej podpalety 16 kolorów (`docs/amiga/`, `src/art.js`)
-- [ ] **Podłogi z packa CC0** (ścieżka „D + A”): pobrać Small 128×64 →
-      `npm run import-pack` → `npm run pipeline:pack` → obejrzeć atlasy i podjąć
-      decyzję o scaleniu z grą (patrz niżej)
+- [ ] **Podłogi z packa CC0** (ścieżka „D + A”): pack pocięty i przemapowany,
+      atlas 88 kafli / 10 rodzajów gotowy do oceny; zostaje decyzja o scaleniu
+      z grą (patrz niżej)
+- [x] Wypalanie własnych kafli podłóg z gry (`bake-ground-tiles.mjs`) — asfalt,
+      którego nie ma w packu
 - [ ] Animacje 2–4 klatkowe + mirroring boków dla postaci i rekwizytów
 - [ ] Efekty z twardym limitem instancji (krew, łuski, dym, błysk, ślady stóp)
 - [ ] Portret gracza + pasek stanu w 320×200
@@ -89,31 +109,36 @@ Rezultat weryfikacji na realnym packu (2026-10-19):
   `carpet`, więc `carpet` ma wreszcie źródło plikowe.
 - **`Grill/Grate → concrete`**, **`Stone → concrete`** (decyzja): kratki metalowe
   i płyty kamienne to podłoga, nie droga.
-- **`asphalt` nie ma źródła w packu** — decyzja: **rysujemy własne kafle**
-  (4–8 × 128×64 z magenta tłem, ten sam pipeline) plus odpowiednik w
-  `makeGroundTiles`. Sprawdzone: `Stone → asphalt` po kwantyzacji czyta się jak
-  piaskowiec (`shots/atlas-vs-source.png`).
+- **`asphalt` nie ma źródła w packu** — zrobione: `tools/bake-ground-tiles.mjs`
+  wypala `asphalt_01..06` z `src/art.js` do `assets/source_tiles/` (gra rysuje
+  ten sam kafel, więc atlas Amigi zgadza się z przeglądarką), a importer dokłada
+  je przez `--also`. Sprawdzone wcześniej: `Stone → asphalt` po kwantyzacji
+  czyta się jak piaskowiec, nie jezdnia.
 - **`water` ← `Elements`**: arkusz `Elements_01` to woda, `Elements_02` to
   bagno/mul — wybrane ręcznie: `--pick water=1-18`.
 - **`ice`** pomijane (brak rodzaju); `Wall Pack` (64×96, 72×100) to materiał na
   osobny etap ścian, nie na ten importer.
-- Atlas Amigi odtworzony z packa: 82 kafle. Ocena wizualna: `shots/pack-final.png`
-  (źródła), `shots/atlas-vs-source.png` (źródło vs komórka atlasu),
+- Atlas Amigi odtworzony z packa + asfaltu: **88 kafli, 10/10 rodzajów**. Ocena
+  wizualna: `shots/pack-final.png` (źródła), `shots/atlas-vs-source.png` (źródło
+  vs komórka atlasu), `shots/asphalt-baked.png` (sześć wypalonych asfaltów),
   `shots/compare-kinds.png` (materiały packa), `shots/pack-candidates.txt`
   (numery do `--pick`).
 
-Zadanie „pack → gra” (osobne, do otwarcia po scaleniu PR #7):
+Zadanie „pack → gra” (osobne, otwarte po PR #7):
 
-1. dorysować kafle `asphalt_01..0N` (128×64, magenta tło) do
-   `assets/source_tiles/` i odpowiednik proceduralny w `makeGroundTiles`;
+1. ~~dorysować kafle `asphalt_01..0N`~~ — **zrobione** na `feat/asphalt-floors`
+   (`bake-ground-tiles.mjs`, `asphalt_01..06`, `--also`);
 2. zamrozić `--pick` dla `water` i liczbę wariantów na rodzaj;
 3. przeliczyć `data/tilesets.json`: po przejściu na pack wiszą odwołania
    `tile/stone_01` i `tile/path_01` (zniknęły), a `tile/lava_01` i
    `tile/panel_blinking` nigdy nie miały plików — nazwy podłóg w packu to
-   `<rodzaj>_<nn>`;
+   `<rodzaj>_<nn>` (asfalt daje wypalanie, więc `tile/asphalt_01` wreszcie istnieje);
 4. zdecydować o przeglądarce: `makeGroundTiles` proceduralnie vs `?art=pack`;
 5. świadomie zacommitować produkty (`assets/clean_128|tiles_*|quantized_64`,
-   `docs/amiga/**`) razem ze zmianą źródła.
+   `docs/amiga/**`) razem ze zmianą źródła;
+6. ewentualnie wypalić pozostałe rodzaje i wycofać zaślepkowe
+   `generate-source-tiles.mjs` (dziś `path_01`, `stone_01`, `concrete_01`… to
+   placeholdery, nie grafika gry).
 
 Rekomendacja: ocenić atlasy (Amiberry 8.3.0 jest w systemie), dopiero potem
 decydować o przeglądarce. Nie zmieniać `tilesets.json`, dopóki atlasy nie są
@@ -174,7 +199,7 @@ ADF przestaje być domyślnym artefaktem — zostaje trybem zgodności/deweloper
 ## Proces (obowiązuje w każdym zadaniu)
 
 1. Gałąź zadania (`arena/<id>-amboid` albo `feat/<temat>`), nigdy praca wprost na `main`.
-2. Zmiana + `npm test` (215 OK / 0 FAIL, modular 65/65, iso passed, pack 21/21).
+2. Zmiana + `npm test` (215 OK / 0 FAIL, modular 65/65, iso passed, pack 27/27, bake 5/5).
 3. PR do `main`, opis przez `gh api --method PATCH ... -f body=...`.
 4. Jawny merge: `gh pr merge <nr> --merge`.
 5. Tag + Release z tego samego commitu; ZIP źródeł jako asset Release.

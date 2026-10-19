@@ -114,6 +114,9 @@ Profil **OCS** (`render_ocs.c`) to tryb zgodności — nie priorytet.
 ## 4. Pipeline assetów
 
 Jedno źródło: `assets/source_tiles/*.png` (128 px). Wszystko dalej jest produktem.
+Kafle mogą powstawać dwiema drogami: `tools/bake-ground-tiles.mjs` wypala je
+z `src/art.js` (§4b), a `tools/import-isotilepack.mjs` tnie zewnętrzny pack CC0
+do `assets/source_pack/` (§4a).
 
 | Krok | Narzędzie | Wejście | Wyjście |
 |---|---|---|---|
@@ -163,6 +166,11 @@ npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE doc
   przed ścianami i „thick” overworldem, których `resize-tiles` nie umie przeskalować.
 - **Filtry**: `--only <fragment>` / `--include`, `--exclude <fragment>` (powtarzalne,
   dopasowanie po fragmencie ścieżki). Bez nich packi mieszają się w jeden stos.
+- **Uzupełnienia `--also <dir>`**: rodzaje, których pack nie ma (np. `asphalt`),
+  importer dokłada z podanego katalogu po nazwie `<rodzaj>_<nn>.png` — i **tylko**
+  wtedy, gdy pack nie dał dla tego rodzaju nic (dwa style nigdy się nie mieszają
+  w jednym rodzaju). Dla tego archiwum: `--also assets/source_tiles` uzupełnia
+  asfalt wypalony z gry (patrz „Wypalanie podłóg” niżej).
 - **Mapowanie** materiałów packa na `GROUND_SPEC` (`DEFAULT_MATERIAL_MAP`):
 
   | pack | rodzaj | uwaga |
@@ -177,7 +185,7 @@ npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE doc
   | Brick | `sidewalk` | bruk/płytki, kilka kolorów |
   | Elements | `water` | tylko woda: `--pick water=1-18` (`Elements_01`) |
   | Ice | — | pomijane (brak rodzaju w `GROUND_SPEC`) |
-  | *asfalt* | — | **brak w packu**: jezdnie rysujemy sami (ROADMAP, Etap 4) |
+  | *asfalt* | — | **brak w packu**: uzupełniamy przez `--also assets/source_tiles` |
 
   Nadpisanie: `--map grill=concrete,ice=skip`.
 - **Kuracja**: domyślnie **4 kafle na rodzaj** równomiernie z całego zbioru;
@@ -189,22 +197,46 @@ npm run pipeline:pack:full           # + atlas/mapa/items/eksport (NADPISUJE doc
   (z filtrami i `--pick`). **Surowy pack nie jest commitowany** (`.gitignore`);
   do repo wchodzi skuratorowany `assets/source_pack/` (mały, czyni pipeline
   odtwarzalnym) oraz pochodne atlasy.
-- Sprawdzona komenda dla tego archiwum (daje 82 kafle, **9/10** rodzajów — bez
-  asfaltu, który rysujemy sami):
+- Sprawdzona komenda dla tego archiwum (daje 88 kafli, **10/10** rodzajów —
+  asfalt dokładany przez `--also`):
 
   ```bash
+  npm run bake-tiles             # asphalt_01..06 z src/art.js -> assets/source_tiles
   node tools/import-isotilepack.mjs --only "Floor Tiles" --per-material 8 \
-      --pick water=1-18 --preview shots/pack-final.png --list shots/pack-candidates.txt
+      --pick water=1-18 --also assets/source_tiles \
+      --preview shots/pack-final.png --list shots/pack-candidates.txt
   npm run pipeline:pack:full     # NADPISUJE docs/amiga/**
   ```
 
   Kolejność kafli w atlasie to porządek alfabetyczny nazw rodzajów; konkretne
   numery są w `docs/amiga/atlases/atlas_defs.h` (`TILE_ID_*`).
-- Test importera: `npm run test:pack` (24/24, nie wymaga packa — buduje
+- Test importera: `npm run test:pack` (27/27, nie wymaga packa — buduje
   syntetyczne arkusze z fixture'ów `assets/source/isotilepack/demo/`).
 - `png_mini.js` obsługuje też PNG indeksowane (colorType 3, 1/2/4/8 bitów,
   `PLTE` + `tRNS`), bo packi na itch.io często takie są. 16-bit i interlace
   są jawnie odrzucane.
+
+### 4b. Wypalanie podłóg proceduralnych do PNG (`bake-ground-tiles.mjs`)
+
+Gra rysuje podłogi proceduralnie w `src/art.js` (32×16, indeksy palety), ale
+pipeline Amigi potrzebuje plików 128×64. `tools/bake-ground-tiles.mjs` bierze
+kafle z `buildArt()` i wypala je do PNG z tłem magenta:
+
+```bash
+npm run bake-tiles                          # asphalt_01..06 -> assets/source_tiles
+node tools/bake-ground-tiles.mjs --all      # wszystkie rodzaje z GROUND_SPEC
+```
+
+- Skalowanie to **×4** (32×16 → 128×64). `resize-tiles` skaluje potem ÷2 i ÷2
+  (nearest), co wraca **dokładnie** do 32×16 — kafel w atlasie OCS jest
+  identyczny z tym, co rysuje przeglądarka (pilnuje tego test wypalania).
+- Liczba wariantów wynika z `GROUND_SPEC` (dla `asphalt` — 6), a wynik jest
+  deterministyczny: `art.js` nie używa `Math.random()` w klatce.
+- Wypalone PNG są **źródłami** (commituje się je razem z `assets/source_tiles`).
+  Wypełniają rodzaje, których pack CC0 nie ma; trafiają do `assets/source_pack`
+  przez `--also` (albo osobno, zwykłym `npm run pipeline`).
+- To docelowa droga dla własnych kafli: `generate-source-tiles.mjs` tworzy
+  stare, zaślepkowe źródła i w razie potrzeby jego rodzaje też można wypalać.
 
 **Do wykorzystania później:** `Wall Pack` (Flat 64×96, Thick 72×100) to gotowe
 ściany i okna — materiał na osobny etap (geometria `WALL_H`, inne skalowanie niż
@@ -227,10 +259,11 @@ npm test             # pełna bramka jakości
 npm run test:modular # tylko moduły + zgodność z eksportem Amigi
 npm run test:iso     # tylko silnik izometryczny z PR #5
 npm run test:pack    # tylko import packa CC0 + clean/resize/quantize
+npm run test:bake    # tylko wypalanie podłóg proceduralnych do PNG
 npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 ```
 
-**Oczekiwany wynik `npm test`** (stan 2026-10-18):
+**Oczekiwany wynik `npm test`** (stan 2026-10-19):
 
 | element | wynik |
 |---|---|
@@ -239,7 +272,8 @@ npm start            # podgląd: http://localhost:8080 (PORT nadpisuje)
 | `tools/stress.mjs` | 6000 klatek bez błędu |
 | `tools/test-modular-system.mjs` | **65/65 OK** |
 | `tools/isometric/test.mjs` | `isometric pipeline tests passed` |
-| `tools/test-isotilepack-import.mjs` | **24/24 OK** (import packa, filtry, geometria 2:1, `--pick`, kontaktówka, łańcuch skalowania) |
+| `tools/test-isotilepack-import.mjs` | **27/27 OK** (import packa, filtry, geometria 2:1, `--pick`, `--also`, kontaktówka, łańcuch skalowania) |
+| `tools/test-bake-ground-tiles.mjs` | **5/5 OK** (geometria wypalania, determinizm, powrót do 32×16) |
 
 ### Pułapka: `build/` nie jest w gicie
 
@@ -343,7 +377,7 @@ cd AmBoid
 git checkout main            # albo gałąź zadania
 npm install
 node tools/build_adf.mjs     # obejście braku build/ (placeholdery)
-npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 24/24
+npm test                     # oczekiwane: 215 OK / 0 FAIL, 65/65, iso passed, pack 27/27, bake 5/5
 ```
 
 Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
@@ -368,7 +402,8 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | 2026-10-19 | Amiberry 8.3.0 + WHDLoad w systemie = środowisko testów Amigi | użytkownik potwierdził konfigurację; używać przy `docs/WHDLOAD.md` |
 | 2026-10-19 | Importer ma **filtry ścieżek** (`--only`/`--exclude`) i **bramkę 2:1** | jedno archiwum SBS zawiera 3 packi (podłogi, overworld, ściany 64×96); bez tego ściany trafiały na podłogi |
 | 2026-10-19 | `Pattern → carpet`, `Grill/Grate → concrete`, `Stone → concrete` | pack daje 9/10 rodzajów (bez asfaltu); kratki metalowe i płyty kamienne to podłoga, nie droga |
-| 2026-10-19 | **Asfalt rysujemy sami** (4–8 kafli 128×64 + odpowiednik proceduralny) | pack SBS nie ma nic drogowego; `Stone → asphalt` po kwantyzacji wyglądał jak piaskowiec |
+| 2026-10-19 | **Asfalt rysujemy sami** — `tools/bake-ground-tiles.mjs` wypala kafle z `src/art.js` | pack SBS nie ma nic drogowego; `Stone → asphalt` po kwantyzacji wyglądał jak piaskowiec. Wypalanie z gry daje kafel identyczny z przeglądarką (×4 → ÷2 ÷2 wraca do 32×16) |
+| 2026-10-19 | Importer ma `--also <dir>`: uzupełnia rodzaje, których pack nie ma | jedno źródło prawdy dla `assets/source_pack`; pack i własne kafle nie mieszają się w jednym rodzaju |
 | 2026-10-19 | Integracja pack → gra to **osobne zadanie** | PR #7 kończy narzędzia; `data/tilesets.json` i decyzja proceduralne vs `?art=pack` dopiero przy scalaniu z grą |
 | 2026-10-19 | Kroki 1–3 pipeline'u **sprzątają osierocone kafle** (`tools/tile-dir-utils.mjs`) | przy zmianie źródła stary `path_01`/`stone_01` zostawał w `tiles_*` i atlasie (92 zamiast 90 kafli) |
 | 2026-10-19 | `--pick` przyjmuje zakresy (`water=1-18`) | wybór wody bez wypisywania 18 numerów |
@@ -420,4 +455,6 @@ Potem przeczytaj ten plik i `docs/ROADMAP.md`. Dopiero potem kod.
 | **kuracja** | wybór kafli na rodzaj: `--per-material N` (domyślnie 4) albo ręcznie `--pick` |
 | **bramka 2:1** | odrzucanie kafli, gdzie `tileW ≠ 2 × tileH` (ściany 64×96, „thick” 128×72) |
 | **osierocony kafel** | plik w `clean_128`/`tiles_*`/`quantized_64`, którego nie ma już w źródle; kroki 1–3 go usuwają |
+| **wypalanie (bake)** | zamiana proceduralnych kafli z `src/art.js` na PNG 128×64 (`bake-ground-tiles.mjs`), gotowe dla pipeline'u i dla `--also` |
+| **`--also`** | uzupełnienie `assets/source_pack` kaflami spoza packa (tylko dla rodzajów, których pack nie ma) |
 | **WHDLoad** | loader gier z HDD/CF; docelowa forma dystrybucji (patrz `docs/WHDLOAD.md`) |

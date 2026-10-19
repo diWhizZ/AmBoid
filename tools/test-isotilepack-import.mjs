@@ -225,6 +225,54 @@ check('--all bierze wszystkie unikalne kafle (8, nie 16)', () => {
   assert(grass.picked === 8, `grass picked: ${grass.picked}`);
 });
 
+console.log('== 2b. Uzupełnienia z --also (rodzaje spoza packa) ==');
+
+check('--also dokłada rodzaje, których pack nie ma', () => {
+  // Pack syntetyczny nie ma asfaltu (brak folderu z "asphalt"/"stone"), więc
+  // własne źródło powinno je uzupełnić — i tylko ono.
+  const alsoDir = path.join(tmp, 'also');
+  writePng(path.join(alsoDir, 'asphalt_01.png'), makeTile(20, 20, 20));
+  writePng(path.join(alsoDir, 'asphalt_02.png'), makeTile(60, 60, 60));
+  writePng(path.join(alsoDir, 'asphalt_10.png'), makeTile(90, 90, 90));
+  // Kafle rodzajów, które pack już ma, muszą zostać zignorowane (bez mieszania).
+  writePng(path.join(alsoDir, 'grass_01.png'), makeTile(0, 255, 0));
+
+  const outAlso = path.join(tmp, 'out-also');
+  const r = importIsotilePack({ inputDir: packDir, outputDir: outAlso, perMaterial: 1, also: [alsoDir] });
+
+  const asphalt = r.report.find((x) => x.kind === 'asphalt');
+  assert(asphalt && asphalt.found === 3 && asphalt.picked === 1, `asphalt: ${JSON.stringify(asphalt)}`);
+  assert(asphalt.own === 3, `asphalt.own: ${asphalt.own} (3 kafle z --also)`);
+  const grass = r.report.find((x) => x.kind === 'grass');
+  assert(grass.found === 8 && !grass.own, `grass z packa, nie z --also: ${JSON.stringify(grass)}`);
+
+  const names = fs.readdirSync(outAlso).filter((f) => f.endsWith('.png')).sort();
+  assert(names.includes('asphalt_01.png'), `brak asphalt_01.png w ${names}`);
+  const notice = fs.readFileSync(path.join(outAlso, 'NOTICE.md'), 'utf8');
+  assert(/--also/.test(notice), 'NOTICE bez --also');
+  assert(/Rodzaje spoza packa/.test(notice), 'NOTICE bez sekcji o własnych kaflach');
+  assert(/własne \(`--also`\)/.test(notice), 'NOTICE bez oznaczenia źródła w tabeli');
+});
+
+check('--also: kolejność wg numeru pliku, nie leksykograficznie', () => {
+  const alsoDir = path.join(tmp, 'also-order');
+  // 2 < 10 tylko liczbowo; leksykograficznie "10" wylądowałoby przed "2".
+  writePng(path.join(alsoDir, 'asphalt_02.png'), makeTile(2, 2, 2));
+  writePng(path.join(alsoDir, 'asphalt_10.png'), makeTile(10, 10, 10));
+  const outAlso = path.join(tmp, 'out-also-order');
+  importIsotilePack({ inputDir: packDir, outputDir: outAlso, perMaterial: 0, also: [alsoDir] });
+  const first = PNG.sync.read(fs.readFileSync(path.join(outAlso, 'asphalt_01.png')));
+  assert(first.data[0] === 2, `pierwszy kafel to numer 2 (dostałem RGB ${first.data[0]})`);
+});
+
+check('--also: brak katalogu to czytelny błąd', () => {
+  let err = null;
+  try {
+    importIsotilePack({ inputDir: packDir, outputDir: path.join(tmp, 'out-missing'), also: ['nie/takiego/katalogu'] });
+  } catch (e) { err = e; }
+  assert(err && /--also/.test(err.message), `błąd: ${err && err.message}`);
+});
+
 console.log('== 3. Łańcuch: clean-magenta -> resize -> quantize ==');
 const cleanDir = path.join(tmp, 'clean');
 const t64 = path.join(tmp, 't64');
